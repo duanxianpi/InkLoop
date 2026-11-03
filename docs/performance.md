@@ -2,6 +2,19 @@
 
 The current foundation **does not have a demonstrated 10 ms CPU budget for every supported request**. Ordinary page/session requests are inexpensive, but MCP discovery has outliers and larger valid MCP bodies exceed 10 ms before product persistence is implemented.
 
+## Audit closure and development decision
+
+The two remaining auth findings are fixed in commit `6f279b8`:
+
+| Finding                                              | Result                                                                                                                                                   | Verification                                                                                                                      |
+| ---------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| Expired WebAuthn challenges accumulated indefinitely | Each successful options request removes at most 32 expired challenges, deleting dependent operations first, in the same transaction as the new challenge | Local D1 checks cover batch bounds, foreign keys and preservation of unexpired replay guards; remote D1 readback confirms removal |
+| JSON `null` caused auth handlers to return 500       | Auth JSON endpoints require an object and reject null, arrays and primitives with `400 invalid_request`                                                  | Local route regression checks and remote null-body requests                                                                       |
+
+Prettier, Worker/Web TypeScript, build and all 12 automated tests pass. Test cases were extended within the existing integration suite. No production resource or account subscription was changed. Cleanup verification found no remaining test Worker, Tail Worker, D1 database, KV namespace, R2 bucket or Durable Object namespace.
+
+The architecture is ready for product implementation. A guarantee that every supported request fits Workers Free is **not** ready. These are separate acceptance decisions: continue with the selected Hono/service boundaries, while treating CPU capacity as an unresolved operating constraint.
+
 ## Method and scope
 
 - Deployed the current Hono/React foundation, including auth object validation and bounded challenge cleanup, to an isolated Cloudflare Worker with separate D1, OAuth KV, R2 and ChangeHub bindings. Production resources were not modified.
@@ -51,3 +64,10 @@ Worker startup validation is a separate measurement: deployment reported 74–11
 Development can continue on the selected architecture, but a strict Free-tier commitment is not currently supported by evidence. Before promising it, profile MCP schema/response construction and large-body parsing, choose a measured batch/body budget, and repeat the same remote scenarios after implementing persistence. Retaining the current maximum batch contract may require a Paid runtime budget; no subscription was changed during this test.
 
 All temporary test Workers and their D1/KV/R2 resources are removed after evidence export. The maintained default configuration does not enable the temporary Tail collector or change CPU limits.
+
+## Next verification steps
+
+1. Profile the measured MCP paths before selecting an optimization. Per-request schema construction, tool discovery serialization and body parsing are candidates, not established causes of the outliers.
+2. Benchmark representative create batches and drawing documents after persistence exists. Include body bytes, result size, CPU percentiles and failures; an 8 MiB admission limit alone does not establish a CPU-safe workload.
+3. If Free operation is a requirement, select and validate smaller request/batch limits against that requirement. Otherwise, retain the product contract and evaluate the required runtime budget. This test did not choose or purchase a plan.
+4. Repeat remote checks after meaningful transport, schema or storage changes. Keep physical-device Passkey acceptance and first-install/upgrade testing as separate release checks.
