@@ -1,8 +1,8 @@
-# Agent Whiteboard — Product Specification
+# InkLoop — Product Specification
 
 **Version:** 1.0 — Product behavior requirements  
 **Status:** Implementation target; product services and canvas UI are not yet implemented  
-**Product:** Agent Whiteboard  
+**Product:** InkLoop  
 **Tagline:** _Give your AI a whiteboard._  
 **Architecture:** Bring Your Own AI · Pen-first · MCP-native · Self-hosted
 
@@ -26,7 +26,7 @@ The product model, core workflows, and interaction semantics are frozen. Technic
 
 ## 1. Product Identity
 
-Agent Whiteboard is a lightweight, self-hosted writing surface that enables existing AI Agents to interact with handwritten information.
+InkLoop is a lightweight, self-hosted writing surface that enables existing AI Agents to interact with handwritten information.
 
 The application has two distinct interfaces:
 
@@ -1286,7 +1286,7 @@ The release must clearly document client-specific MCP limitations and supported 
 
 ## 24. Final Design Contract
 
-**Agent Whiteboard is an interaction peripheral for AI Agents, not a replacement AI application.**
+**InkLoop is an interaction peripheral for AI Agents, not a replacement AI application.**
 
 The Human Interface provides a natural writing surface.
 

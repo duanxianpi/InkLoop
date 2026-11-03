@@ -1,8 +1,8 @@
-# Agent Whiteboard
+# InkLoop
 
 Give your AI a whiteboard.
 
-Agent Whiteboard is a self-hosted handwriting surface for AI agents. An agent creates problems through MCP; the owner writes on a persistent canvas, commits an immutable image, and receives feedback attached to that exact submission. The application runs no model and requires no model API key.
+InkLoop is a self-hosted handwriting surface for AI agents. An agent creates problems through MCP; the owner writes on a persistent canvas, commits an immutable image, and receives feedback attached to that exact submission. The application runs no model and requires no model API key.
 
 **Status: architecture foundation.** Passkey authentication, OAuth-protected MCP routing, React account pages, shared contracts and deployment tooling are implemented. The product canvas is an empty React entry; application services and live updates return `not_implemented`. This is not yet a usable handwriting application.
 

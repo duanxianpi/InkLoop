@@ -27,7 +27,7 @@ The deploy command regenerates `dist/public/`, including versioned drawing asset
 
 Import your copy of this repository into Cloudflare Workers using its Git integration. Configure `npm run typecheck` as the build command and `npm run deploy` as the deploy command. The deploy script performs the actual asset build before migration or publication. Use the repository's `wrangler.jsonc` and migrations. Complete any platform prompts for resource availability, including R2.
 
-This describes the intended Whiteboard deployment procedure. An isolated deployment has exercised real authentication, OAuth and MCP transport on Cloudflare; see [CPU measurements](performance.md). Full first-install/upgrade acceptance through the deployment script and physical-device Passkeys remain release checks.
+This describes the intended InkLoop deployment procedure. An isolated deployment has exercised real authentication, OAuth and MCP transport on Cloudflare; see [CPU measurements](performance.md). Full first-install/upgrade acceptance through the deployment script and physical-device Passkeys remain release checks.
 
 ## Claim the owner
 
@@ -52,6 +52,8 @@ Open `/recover`, retrieve the `recovery` key from D1, and register a replacement
 Use `/settings/passkeys/add` to add a Passkey after recent sign-in. Use `/settings/connected-apps` to inspect and revoke a particular MCP authorization; revocation also requires recent sign-in. Signing out of the Web does not revoke an independently authorized MCP client.
 
 ## Upgrades and durability
+
+The Worker is named `inkloop`. An instance deployed before the rename, as `agent-whiteboard`, must keep its old name in `wrangler.jsonc`: a new name creates a different Worker with a different `workers.dev` address and newly provisioned resources, and its existing Passkeys and OAuth grants are bound to the old origin.
 
 Never rewrite migrations `0001`–`0003` on a deployed instance. Append migrations and preserve binding identities. A code rollback does not reverse database migrations.
 

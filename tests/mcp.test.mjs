@@ -73,7 +73,7 @@ test('the official MCP client connects, lists and calls every tool', async () =>
     }),
   );
   try {
-    assert.equal(client.getServerVersion().name, 'agent-whiteboard');
+    assert.equal(client.getServerVersion().name, 'inkloop');
     const { tools } = await client.listTools();
     assert.deepEqual(
       tools.map((tool) => tool.name),

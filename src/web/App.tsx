@@ -67,7 +67,7 @@ export function App() {
   return (
     <main className="auth-page">
       <a className="brand" href="/app">
-        Agent Whiteboard
+        InkLoop
       </a>
       <p role="status">{error || 'Loading…'}</p>
       {error && <button onClick={() => location.reload()}>Retry</button>}

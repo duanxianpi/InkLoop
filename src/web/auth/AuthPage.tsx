@@ -16,7 +16,7 @@ function Layout({ title, children }: { title: string; children: ReactNode }) {
   return (
     <main className="auth-page">
       <a className="brand" href="/app">
-        Agent Whiteboard
+        InkLoop
       </a>
       <h1>{title}</h1>
       {children}

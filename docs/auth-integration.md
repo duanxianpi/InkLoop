@@ -1,6 +1,6 @@
 # Authentication
 
-Whiteboard uses one Hono application as the Worker's fetch handler. Authentication is a set of middleware and handlers within that route tree; it is not an outer application dispatcher. The original Passkey/OAuth implementation was adapted from [self-hosted-mcp-auth](https://github.com/duanxianpi/self-hosted-mcp-auth).
+InkLoop uses one Hono application as the Worker's fetch handler. Authentication is a set of middleware and handlers within that route tree; it is not an outer application dispatcher. The original Passkey/OAuth implementation was adapted from [self-hosted-mcp-auth](https://github.com/duanxianpi/self-hosted-mcp-auth).
 
 ## Routing and policy
 

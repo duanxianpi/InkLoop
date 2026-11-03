@@ -19,7 +19,7 @@ import { callTool, isToolName } from './tools';
  * identical on the wire, and some clients still request it.
  */
 const PROTOCOL_VERSIONS = ['2025-11-25', '2025-06-18'];
-const SERVER_INFO = { name: 'agent-whiteboard', version: '0.1.0' };
+const SERVER_INFO = { name: 'inkloop', version: '0.1.0' };
 
 // JSON-RPC 2.0 error codes.
 const PARSE_ERROR = -32700;

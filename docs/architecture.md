@@ -1,10 +1,10 @@
-# Agent Whiteboard — Final Architecture
+# InkLoop — Final Architecture
 
 Architecture baseline: 2026-11-03 (audit corrections applied). “Final” identifies the selected structure and contracts for the next implementation stage; it does not mean the product is complete.
 
 ## 1. Product and scope
 
-Agent Whiteboard is a single-owner, self-hosted handwriting peripheral for existing AI agents. The owner writes in a browser, commits a rendered answer, and an OAuth-authorized MCP client retrieves that answer and appends feedback.
+InkLoop is a single-owner, self-hosted handwriting peripheral for existing AI agents. The owner writes in a browser, commits a rendered answer, and an OAuth-authorized MCP client retrieves that answer and appends feedback.
 
 The core model is:
 
@@ -91,7 +91,7 @@ OAuth integration receives an authenticated MCP handler from the root router. It
 
 HTML and default API responses use `no-store`. Fingerprinted static assets use `public, max-age=31536000, immutable` through `_headers`. Explicit route cache policies survive middleware, including private immutable Snapshot images: once implemented, such images may remain in the owner's browser cache after session revocation. Their URLs must identify immutable content. Unknown asset paths and direct `/index.html` requests return 404.
 
-Auth source is a maintained Whiteboard adaptation of the upstream template. Updates are reviewed merges, not source synchronization. See [Authentication](auth-integration.md) for the route table and lifecycle.
+Auth source is a maintained InkLoop adaptation of the upstream template. Updates are reviewed merges, not source synchronization. See [Authentication](auth-integration.md) for the route table and lifecycle.
 
 ## 6. Data ownership
 

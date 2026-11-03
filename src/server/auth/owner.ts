@@ -98,7 +98,7 @@ export async function options(request: Request, env: Env, purpose: string, curre
     purpose === 'login'
       ? await generateAuthenticationOptions({ rpID, userVerification: 'required' })
       : await generateRegistrationOptions({
-          rpName: 'Agent Whiteboard',
+          rpName: 'InkLoop',
           rpID,
           userID: new TextEncoder().encode('owner'),
           userName: 'Owner',
