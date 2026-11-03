@@ -24,6 +24,7 @@ The current checks cover:
 - OAuth client registration, protected consent preparation, approval/denial/replay and mandatory read-scope checks, SDK cookie/handle validation, PKCE token exchange and MCP tool discovery.
 - Exclusive create destinations, filtered/paginated Web client calls and malformed JSON.
 - MCP acceptance of a large valid batch and rejection of oversized requests.
+- Auth object-shape rejection and bounded expired-challenge cleanup, including foreign keys and preservation of active replay guards.
 - Shared streamed body limits, media-type casing, invalid UTF-8 and empty/oversized OAuth requests, including requests without `Content-Length`.
 - Matching HTTP/MCP application error codes for authorization and service failures.
 

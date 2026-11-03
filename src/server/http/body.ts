@@ -55,3 +55,14 @@ export async function boundedText(request: Request, limit: number): Promise<stri
     throw new HttpError(400, 'Invalid UTF-8');
   }
 }
+
+/** Auth payloads must be objects before handlers inspect ceremony-specific fields. */
+export async function boundedJsonObject(
+  request: Request,
+  limit: number,
+): Promise<Record<string, unknown>> {
+  const value = await boundedJson(request, limit);
+  if (value === null || typeof value !== 'object' || Array.isArray(value))
+    throw new HttpError(400, 'JSON body must be an object');
+  return value as Record<string, unknown>;
+}

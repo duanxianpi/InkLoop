@@ -67,6 +67,17 @@ test('Hono SPA routing, direct static assets, owner sessions and OAuth lifecycle
       .first();
     assert.ok(bootstrap.secret_display);
     assert.ok(!setupHtml.includes(bootstrap.secret_display));
+    for (const path of ['/auth/bootstrap/options', '/auth/bootstrap/finish']) {
+      for (const value of [null, [], 'text', 7, true]) {
+        const invalid = await mf.dispatchFetch(origin + path, {
+          method: 'POST',
+          headers: { Origin: origin, 'Content-Type': 'application/json' },
+          body: JSON.stringify(value),
+        });
+        assert.equal(invalid.status, 400, path);
+        assert.equal((await invalid.json()).error, 'invalid_request');
+      }
+    }
     const ceremony = await mf.dispatchFetch(origin + '/auth/bootstrap/options', {
       method: 'POST',
       headers: { Origin: origin, 'Content-Type': 'application/json' },
@@ -142,6 +153,76 @@ test('Hono SPA routing, direct static assets, owner sessions and OAuth lifecycle
     assert.equal((await request('/api/unknown', { headers: auth })).status, 404);
     assert.deepEqual(await (await request('/api/status')).json(), { initialized: true });
     const mutation = { ...auth, Origin: origin, 'Content-Type': 'application/json' };
+    for (const path of ['/auth/consent', '/api/grants/revoke']) {
+      const invalid = await request(path, { method: 'POST', headers: mutation, body: 'null' });
+      assert.equal(invalid.status, 400, path);
+      assert.equal((await invalid.json()).error, 'invalid_request');
+    }
+    // Real FK/replay guards: expired completed and abandoned ceremonies can be pruned,
+    // while an unexpired completed ceremony must retain its operation guard.
+    const cutoff = Math.floor(Date.now() / 1000);
+    const insertChallenge = (id, expires) =>
+      db
+        .prepare(
+          'INSERT INTO webauthn_challenges (id,challenge,purpose,browser_digest,auth_epoch,canonical_origin,rp_id,expires_at) VALUES (?, ?, ?, ?, 3, ?, ?, ?)',
+        )
+        .bind(id, 'challenge', 'add', 'browser', origin, 'whiteboard.example', expires);
+    const insertOperation = (id) =>
+      db
+        .prepare(
+          'INSERT INTO auth_operations (id,purpose,challenge_id,browser_digest,auth_epoch,created_at) VALUES (?, ?, ?, ?, 3, ?)',
+        )
+        .bind('op-' + id, 'add', id, 'browser', cutoff);
+    await db.batch([
+      insertChallenge('expired-completed', cutoff + 300),
+      insertOperation('expired-completed'),
+      insertChallenge('active-completed', cutoff + 300),
+      insertOperation('active-completed'),
+    ]);
+    await db
+      .prepare("UPDATE webauthn_challenges SET expires_at=? WHERE id='expired-completed'")
+      .bind(cutoff - 100)
+      .run();
+    await db.batch(
+      Array.from({ length: 34 }, (_, i) => insertChallenge('abandoned-' + i, cutoff - 50)),
+    );
+    const loginOptions = () =>
+      request('/auth/login/options', { method: 'POST', headers: mutation, body: '{}' });
+    assert.equal((await loginOptions()).status, 200);
+    assert.equal(
+      (
+        await db
+          .prepare('SELECT count(*) AS n FROM webauthn_challenges WHERE expires_at<=?')
+          .bind(cutoff)
+          .first()
+      ).n,
+      3,
+      'cleanup deletes at most 32 expired challenges',
+    );
+    assert.equal(
+      await db
+        .prepare("SELECT id FROM auth_operations WHERE challenge_id='expired-completed'")
+        .first(),
+      null,
+    );
+    assert.ok(
+      await db
+        .prepare("SELECT id FROM auth_operations WHERE challenge_id='active-completed'")
+        .first(),
+    );
+    assert.equal((await loginOptions()).status, 200);
+    assert.equal(
+      (
+        await db
+          .prepare('SELECT count(*) AS n FROM webauthn_challenges WHERE expires_at<=?')
+          .bind(cutoff)
+          .first()
+      ).n,
+      0,
+    );
+    const operationReplay = insertOperation('active-completed');
+    await assert.rejects(operationReplay.run(), /UNIQUE/);
+
     assert.equal(
       (await request('/api/preferences', { method: 'PUT', headers: mutation, body: '{' })).status,
       400,

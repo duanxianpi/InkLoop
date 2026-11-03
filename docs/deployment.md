@@ -27,7 +27,7 @@ The deploy command regenerates `dist/public/`, including versioned drawing asset
 
 Import your copy of this repository into Cloudflare Workers using its Git integration. Configure `npm run typecheck` as the build command and `npm run deploy` as the deploy command. The deploy script performs the actual asset build before migration or publication. Use the repository's `wrangler.jsonc` and migrations. Complete any platform prompts for resource availability, including R2.
 
-This describes the intended Whiteboard deployment procedure. A new full deployment of this React-auth revision has not yet been accepted end-to-end; local tests do not substitute for that release check.
+This describes the intended Whiteboard deployment procedure. An isolated deployment has exercised real authentication, OAuth and MCP transport on Cloudflare; see [CPU measurements](performance.md). Full first-install/upgrade acceptance through the deployment script and physical-device Passkeys remain release checks.
 
 ## Claim the owner
 

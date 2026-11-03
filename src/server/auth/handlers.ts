@@ -1,11 +1,11 @@
 import { assert, json, now, random, type Env, type OwnerSession } from './common';
-import { boundedJson, boundedText } from '../http/body';
+import { boundedJsonObject, boundedText } from '../http/body';
 import { LIMITS } from '../../shared/limits';
 import type { ConsentData } from '../../shared/auth';
 
 /** Parse only server-validated OAuth context; the client never selects its own redirect destination. */
 export async function prepareConsent(request: Request, env: Env, origin: string) {
-  const data = (await boundedJson(request, LIMITS.authRequestBytes)) as any;
+  const data = (await boundedJsonObject(request, LIMITS.authRequestBytes)) as any;
   assert(
     typeof data.query === 'string' && data.query.length <= 16384,
     400,
@@ -86,7 +86,7 @@ export async function listGrants(request: Request, env: Env, user: OwnerSession)
 
 export async function revokeGrant(request: Request, env: Env, user: OwnerSession) {
   assert(user!.created_at > now() - 300, 401, 'Reauthentication required');
-  const data = (await boundedJson(request, LIMITS.authRequestBytes)) as any;
+  const data = (await boundedJsonObject(request, LIMITS.authRequestBytes)) as any;
   assert(typeof data.grantId === 'string');
   const selected = await env.DB.prepare(
     'SELECT authorization_id FROM connected_apps WHERE authorization_id=? AND auth_epoch=?',

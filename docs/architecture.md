@@ -27,7 +27,7 @@ There is no built-in LLM, model API key, chat system, automatic grader, backgrou
 | ChangeHub, change counter and long-poll services                | Interfaces only; not operational                                                 |
 | Export/restore, object collection, complete product acceptance  | Pending                                                                          |
 
-Local tests establish the foundation's behavior, not the correctness of future product persistence. Physical-device Passkey testing and deployment validation of this React-auth revision remain release checks.
+Local tests establish the foundation's behavior, not the correctness of future product persistence. The isolated Cloudflare authentication/CPU run is documented in [Runtime measurements](performance.md). Physical-device Passkey testing and production deployment/upgrade acceptance remain release checks.
 
 ## 3. Runtime topology
 
@@ -189,7 +189,7 @@ The hub must enforce auth-epoch changes and define bounded socket lifetime/reval
 
 Inputs and results are centralized in `src/shared/schemas.ts` and `model.ts`. Create destinations have enforced exclusive choices at both Set and Collection levels. The browser list client forwards filters and cursors rather than silently fetching only the first 100 records.
 
-MCP has an 8 MiB body budget; canvas JSON, PNG and preferences have 4 MiB, 8 MiB and 16 KiB budgets respectively. Shared HTTP body readers count streamed bytes before full buffering and reject invalid UTF-8. HTTP and MCP application errors share stable codes plus human-readable messages; OAuth protocol errors retain SDK codes and `error_description`. Auth/OAuth requests retain their separate 64 KiB limit. Field-level limits apply in addition to body budgets. See [API contracts](api.md).
+MCP has an 8 MiB body budget; canvas JSON, PNG and preferences have 4 MiB, 8 MiB and 16 KiB budgets respectively. Shared HTTP body readers count streamed bytes before full buffering and reject invalid UTF-8. HTTP and MCP application errors share stable codes plus human-readable messages; OAuth protocol errors retain SDK codes and `error_description`. Auth/OAuth requests retain their separate 64 KiB limit. Field-level limits apply in addition to body budgets. See [API contracts](api.md). Actual Cloudflare measurements show that larger valid MCP bodies exceed 10 ms even with stub services; current limits are transport budgets, not a guarantee of Free-plan CPU capacity. See [Runtime measurements](performance.md).
 
 ## 11. Build, formatting, deployment and documentation
 

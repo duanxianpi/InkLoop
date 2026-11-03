@@ -52,6 +52,8 @@ The owner proves access to a bootstrap key held in D1 and confirms the deploymen
 
 Recovery replaces Passkeys, rotates the recovery key, increments the auth epoch and invalidates previous Web sessions and MCP authorizations. D1 epoch/revocation checks are authoritative; best-effort OAuth KV cleanup is supplementary.
 
+Auth JSON endpoints reject null, arrays and primitives with `400 invalid_request` before reading fields. When issuing a challenge, the server removes at most 32 expired challenges in the same D1 batch as the insert, deleting their `auth_operations` foreign-key children first. Unexpired challenges and their replay guards remain intact. Cleanup is opportunistic: an idle deployment may retain expired rows until the next successful options request; new requests drain expired backlog faster than they add challenges.
+
 Connected-app revocation requires a recent session. It writes a D1 revocation marker before attempting SDK cleanup. Web logout clears the current Web session; it does not revoke independently authorized MCP clients.
 
 ## Maintenance and validation

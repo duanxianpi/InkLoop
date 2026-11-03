@@ -14,3 +14,7 @@ These pages describe the current foundation and the intended product without tre
 The product specification defines user-visible requirements. Architecture selects the technical implementation. API documentation describes the current code contracts. If behavior changes, update these documents with the code.
 
 `docs/` is the public documentation set. Local planning, prototype decisions and historical experiment evidence belong in ignored `internal/docs/`; public pages must not depend on those files. Historical prototype tests do not establish that the current production product is complete.
+
+## Runtime measurements
+
+[Cloudflare CPU measurements](performance.md) records actual Free-plan timings, request sizes, methodology and limits of the evidence.

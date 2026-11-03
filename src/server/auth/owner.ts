@@ -1,5 +1,6 @@
-import { boundedJson } from '../http/body';
+import { boundedJsonObject } from '../http/body';
 import { LIMITS } from '../../shared/limits';
+import { expiredChallengeCleanup } from './maintenance';
 import {
   generateRegistrationOptions,
   verifyRegistrationResponse,
@@ -68,7 +69,7 @@ function confirmedOrigin(value: unknown, request: Request) {
 }
 export async function options(request: Request, env: Env, purpose: string) {
   const s = await state(env);
-  const data = (await boundedJson(request, LIMITS.authRequestBytes)) as any;
+  const data = (await boundedJsonObject(request, LIMITS.authRequestBytes)) as any;
   csrf(request, s.canonical_origin ?? new URL(request.url).origin);
   const headers = new Headers();
   const browser = cookie(request, '__Host-ceremony') || random();
@@ -108,10 +109,12 @@ export async function options(request: Request, env: Env, purpose: string) {
           })),
         });
   const id = random();
-  await env.DB.prepare(
-    'INSERT INTO webauthn_challenges (id,challenge,purpose,browser_digest,auth_epoch,key_generation,canonical_origin,rp_id,expires_at) VALUES (?,?,?,?,?,?,?,?,?)',
-  )
-    .bind(
+  const t = now();
+  await env.DB.batch([
+    ...expiredChallengeCleanup(env.DB, t),
+    env.DB.prepare(
+      'INSERT INTO webauthn_challenges (id,challenge,purpose,browser_digest,auth_epoch,key_generation,canonical_origin,rp_id,expires_at) VALUES (?,?,?,?,?,?,?,?,?)',
+    ).bind(
       id,
       publicKey.challenge,
       purpose,
@@ -120,14 +123,14 @@ export async function options(request: Request, env: Env, purpose: string) {
       generation,
       origin,
       rpID,
-      now() + 300,
-    )
-    .run();
+      t + 300,
+    ),
+  ]);
   return json({ id, publicKey }, 200, headers);
 }
 export async function finish(request: Request, env: Env, purpose: string) {
   const s = await state(env);
-  const data = (await boundedJson(request, LIMITS.authRequestBytes)) as any;
+  const data = (await boundedJsonObject(request, LIMITS.authRequestBytes)) as any;
   csrf(request, s.canonical_origin ?? new URL(request.url).origin);
   assert(typeof data.id === 'string' && data.response?.id);
   const browserDigest = await digest(cookie(request, '__Host-ceremony'));
