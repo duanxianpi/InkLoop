@@ -31,7 +31,7 @@ Local tests establish the foundation's behavior, not the correctness of future p
 
 ## 3. Runtime topology
 
-One Cloudflare Worker exports a Hono application as its fetch handler. Hono owns the route tree for pages, account APIs, product APIs and SDK protocol endpoints. Matching `/assets/*` files are served directly by Cloudflare Static Assets, without invoking the Worker or querying D1. There is no outer authentication dispatcher or external auth service.
+One Cloudflare Worker exports a Hono application as its fetch handler. Hono owns the route tree for pages, account APIs, product APIs, OAuth SDK protocol endpoints and the MCP endpoint. Matching `/assets/*` files are served directly by Cloudflare Static Assets, without invoking the Worker or querying D1. There is no outer authentication dispatcher or external auth service.
 
 ```mermaid
 flowchart TD
@@ -40,9 +40,9 @@ flowchart TD
     Agent[AI client: Remote MCP] --> Hono
     Hono --> Assets[Static HTML shell via ASSETS binding]
     Hono --> Auth[Passkey and consent handlers]
-    Hono --> SDK[OAuth and MCP SDK endpoints]
+    Hono --> SDK[OAuth SDK endpoints]
     Hono --> Web[Authenticated product API router]
-    SDK --> MCP[MCP tools]
+    SDK -->|authenticated /mcp| MCP[Hand-rolled MCP endpoint and tools]
     Web --> Services[Application services]
     MCP --> Services
     Auth --> DB[(D1)]
@@ -65,7 +65,7 @@ D1 is authoritative for structured state and committed pointers. R2 holds object
 | `src/server/http/`            | Shared bounded body readers and stable HTTP/MCP application error mapping               |
 | `src/shared/pages.ts`         | Page registry shared by Hono and React                                                  |
 | `src/server/routes/`          | Static SPA shell handler and mounted product API router                                 |
-| `src/server/mcp/`             | Tool definitions, scope checks, service dispatch and image content blocks               |
+| `src/server/mcp/`             | Stateless MCP endpoint, tool definitions, input validators, scope checks and dispatch   |
 | `src/server/services/`        | Shared product service interfaces; future business invariants                           |
 | `src/server/env.ts`, `hub.ts` | Bindings/request context and notification-only Durable Object interface                 |
 | `src/web/main.tsx`, `App.tsx` | Single browser entry and page selection                                                 |

@@ -1,4 +1,5 @@
-import { Hono } from 'hono';
+// Same router preset as src/server/index.ts; see the note there.
+import { Hono } from 'hono/tiny';
 import { boundedBytes, boundedJson } from '../http/body';
 import { z } from 'zod';
 import { DomainError } from '../../shared/errors';

@@ -24,6 +24,7 @@ The current checks cover:
 - OAuth client registration, protected consent preparation, approval/denial/replay and mandatory read-scope checks, SDK cookie/handle validation, PKCE token exchange and MCP tool discovery.
 - Exclusive create destinations, filtered/paginated Web client calls and malformed JSON.
 - MCP acceptance of a large valid batch and rejection of oversized requests.
+- The official MCP client (`@modelcontextprotocol/client`, a dev dependency only) connecting to the hand-rolled endpoint and calling every tool; JSON-RPC and transport edge cases; plain input validators agreeing with the zod schemas.
 - Auth object-shape rejection and bounded expired-challenge cleanup, including foreign keys and preservation of active replay guards.
 - Shared streamed body limits, media-type casing, invalid UTF-8 and empty/oversized OAuth requests, including requests without `Content-Length`.
 - Matching HTTP/MCP application error codes for authorization and service failures.
@@ -48,7 +49,7 @@ Use `npm run format` to apply Prettier and `npm run format:check` to verify form
 
 ## Source and contract changes
 
-Keep HTTP and MCP adapters thin. Add business invariants to services and storage constraints, with focused tests for data loss, concurrency and authorization boundaries. Keep local recovery and save queues outside presentation components.
+Keep HTTP and MCP adapters thin. When an MCP tool input changes, change its zod schema in `src/shared/schemas.ts` and the matching validator in `src/server/mcp/input.ts` together; `npm run build` regenerates `src/server/mcp/tools.generated.ts` from the schemas, and the contract test fails if the validator disagrees. Add business invariants to services and storage constraints, with focused tests for data loss, concurrency and authorization boundaries. Keep local recovery and save queues outside presentation components.
 
 Auth code is a local adaptation. Review upstream changes rather than overwriting local React integration or migrations. Preserve the pinned drawing-engine version and native watermark unless a deliberate, separately reviewed change is made.
 
@@ -66,3 +67,5 @@ Ignoring a path does not remove files already tracked by Git. Inspect the reposi
 ## Release checks still outstanding
 
 Product D1 migrations and conditional-commit tests; IndexedDB recovery and save conflicts; full-content PNG export; immutable Snapshot and feedback persistence; live-update loss/reconnect handling; physical iPad/Passkey use; deployment with current assets; real OAuth client image review; data export/restore; safe orphan-object collection.
+
+CPU diagnostics: `npm run perf` reports Node first-method CPU samples separately from correctness tests. These samples are not independent cold isolates or Cloudflare CPU measurements.

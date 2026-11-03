@@ -27,7 +27,9 @@ JSON writes require `Content-Type: application/json`. Submission bodies require 
 
 ## MCP tools
 
-`/mcp` uses OAuth and Streamable HTTP. Every request requires `mcp:read`; mutations also require `mcp:write`.
+`/mcp` uses OAuth and stateless Streamable HTTP, protocol version `2025-11-25` (`2025-06-18` is also accepted; the two are identical for this subset). Every request requires `mcp:read`; mutations also require `mcp:write`.
+
+The endpoint is hand-rolled (`src/server/mcp/handler.ts`) rather than built on the MCP SDK, to keep per-request CPU low on Workers Free ([Runtime measurements](performance.md)). It implements `initialize`, `ping`, `tools/list` and `tools/call` and answers every request with a single JSON response. Notifications are acknowledged with `202`. There are no sessions, SSE streams, batches or server-to-client requests: `GET` and `DELETE` return `405`, other methods return JSON-RPC `-32601`, and an unknown `MCP-Protocol-Version` returns `400`. Invalid tool arguments and missing scopes are returned as `isError` tool results with the application error payload, so the model can correct the call. `tools/list` is generated at build time from the zod schemas in `src/shared/schemas.ts`; request-time validation uses plain functions in `src/server/mcp/input.ts`, which tests keep in agreement with those schemas.
 
 | Tool              | Input and behavior                                                                                                                                                                                                 |
 | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -52,7 +54,7 @@ Creation retries reuse `request_id`. Feedback retries are deduplicated only when
 | Preferences JSON                 | 16 KiB                                            |
 | Auth/OAuth form or JSON requests | 64 KiB                                            |
 
-Shared HTTP readers for product and auth routes count actual streamed bytes, including bodies without `Content-Length`, and stop reading at the limit. The MCP SDK enforces the configured overall budget before tool execution. Schema field limits remain additional constraints: titles 200 characters, problem bodies and feedback 20,000, at most 20 callouts of 4,000 characters, and at most 50 problems per create request. A batch with maximum-length JSON-escaped problem text fits within the MCP envelope budget and is covered by tests.
+Shared HTTP readers for product and auth routes count actual streamed bytes, including bodies without `Content-Length`, and stop reading at the limit. The MCP endpoint applies the same streamed limit to its whole request before parsing. Schema field limits remain additional constraints: titles 200 characters, problem bodies and feedback 20,000, at most 20 callouts of 4,000 characters, and at most 50 problems per create request. A batch with maximum-length JSON-escaped problem text fits within the MCP envelope budget and is covered by tests.
 
 Long polling is capped at six seconds; the planned service has a two-second check interval and at most four checks. No polling or push implementation exists yet.
 

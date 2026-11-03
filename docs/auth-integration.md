@@ -16,7 +16,7 @@ Whiteboard uses one Hono application as the Worker's fetch handler. Authenticati
 | `POST /auth/:purpose/options`, `POST /auth/:purpose/finish` | Passkey handlers with Origin, ceremony and purpose-specific proof checks                                         |
 | `POST /auth/consent`                                        | Session/CSRF-protected preparation of an OAuth consent transaction                                               |
 | `POST /authorize`                                           | Session/CSRF-protected approval or denial; returns SDK-validated `redirectTo` as JSON                            |
-| `/oauth/*`, `/.well-known/*`, `/mcp`                        | Explicitly forwarded to the OAuth SDK; MCP then dispatches the registered tools                                  |
+| `/oauth/*`, `/.well-known/*`, `/mcp`                        | Explicitly forwarded to the OAuth SDK, which authenticates `/mcp` before the MCP endpoint dispatches a tool      |
 | `/api/me`, `/api/grants`, `/api/grants/revoke`, `/logout`   | Authenticated account operations; mutations require matching Origin                                              |
 | Remaining `/api/*`                                          | Authenticated Hono product router; mutations require matching Origin                                             |
 

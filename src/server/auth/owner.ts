@@ -22,6 +22,7 @@ import {
   b64,
   unb64,
   type Env,
+  type State,
 } from './common';
 
 export async function ensureBootstrap(env: Env) {
@@ -67,8 +68,8 @@ function confirmedOrigin(value: unknown, request: Request) {
   );
   return { origin: value, rpID: url.hostname };
 }
-export async function options(request: Request, env: Env, purpose: string) {
-  const s = await state(env);
+export async function options(request: Request, env: Env, purpose: string, current?: State) {
+  const s = current ?? (await state(env));
   const data = (await boundedJsonObject(request, LIMITS.authRequestBytes)) as any;
   csrf(request, s.canonical_origin ?? new URL(request.url).origin);
   const headers = new Headers();
@@ -128,8 +129,8 @@ export async function options(request: Request, env: Env, purpose: string) {
   ]);
   return json({ id, publicKey }, 200, headers);
 }
-export async function finish(request: Request, env: Env, purpose: string) {
-  const s = await state(env);
+export async function finish(request: Request, env: Env, purpose: string, current?: State) {
+  const s = current ?? (await state(env));
   const data = (await boundedJsonObject(request, LIMITS.authRequestBytes)) as any;
   csrf(request, s.canonical_origin ?? new URL(request.url).origin);
   assert(typeof data.id === 'string' && data.response?.id);

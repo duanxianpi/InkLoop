@@ -6,6 +6,7 @@
   "scripts": {
     "build": "node src/tooling/build.mjs",
     "typecheck": "tsc --noEmit && tsc --noEmit -p src/web",
+    "perf": "node --test tests/mcp-cpu.perf.mjs",
     "test": "node --test --test-concurrency=1 tests/*.test.mjs",
     "deploy": "node src/tooling/deploy.mjs",
     "format": "prettier --write .",
@@ -13,7 +14,6 @@
   },
   "dependencies": {
     "@cloudflare/workers-oauth-provider": "1.2.4",
-    "@modelcontextprotocol/server": "2.4.0",
     "@simplewebauthn/server": "14.0.3",
     "@tldraw/assets": "3.15.6",
     "hono": "4.13.16",
@@ -24,6 +24,7 @@
   },
   "devDependencies": {
     "@cloudflare/workers-types": "5.20261102.1",
+    "@modelcontextprotocol/client": "2.4.0",
     "@types/node": "26.6.6",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",

@@ -439,7 +439,23 @@ test('Hono SPA routing, direct static assets, owner sessions and OAuth lifecycle
       limited = await request('/setup', { headers: { 'CF-Connecting-IP': '192.0.2.42' } });
     assert.equal(limited.status, 429);
     assert.equal((await limited.json()).error, 'rate_limited');
+    // A ceremony read under epoch 3 must still fail at commit after recovery increments it.
+    await db
+      .prepare(
+        "INSERT INTO webauthn_challenges (id,challenge,purpose,browser_digest,auth_epoch,canonical_origin,rp_id,expires_at) VALUES ('stale-epoch','c','add','browser',3,?, ?,unixepoch()+300)",
+      )
+      .bind('https://example.test', 'example.test')
+      .run();
     await db.prepare('UPDATE auth_state SET auth_epoch=4').run();
+    await assert.rejects(
+      db
+        .prepare(
+          "INSERT INTO auth_operations (id,purpose,challenge_id,browser_digest,auth_epoch,created_at) VALUES ('stale-operation','add','stale-epoch','browser',3,unixepoch())",
+        )
+        .run(),
+      /invalid_ceremony/,
+    );
+
     assert.equal((await request('/api/me', { headers: auth })).status, 401);
     assert.equal((await request('/app', { headers: auth })).status, 302);
     assert.equal(

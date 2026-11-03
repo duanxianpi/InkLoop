@@ -1,0 +1,4 @@
+scenario,samples,cpu_min_ms,cpu_p50_ms,cpu_p95_ms,cpu_max_ms,above_10_ms
+ten_create_10x1k,20,4,6,9,10,0
+ten_create_10x5k,20,5,7,13,14,3
+ten_create_10x20k,20,7,10,15,16,6

@@ -1,4 +1,6 @@
-import { Hono } from 'hono';
+// hono/tiny (PatternRouter) compiles each route when it is added, at module load. The default
+// router compiles the whole table on the first request, which costs that request several ms of CPU.
+import { Hono } from 'hono/tiny';
 import { AuthorizationError, CimdFetchError } from '@cloudflare/workers-oauth-provider';
 import { assert, json, setCookie } from './auth/common';
 import { boundedText } from './http/body';
@@ -7,6 +9,7 @@ import { DomainError } from '../shared/errors';
 import { LIMITS } from '../shared/limits';
 import { PAGES } from '../shared/pages';
 import { handleMcp } from './mcp/handler';
+import { createServices } from './services';
 import { ensureBootstrap, finish, options } from './auth/owner';
 import { listGrants, prepareConsent, revokeGrant, submitConsent } from './auth/handlers';
 import { handleOAuth, withOAuth } from './auth/oauth';
@@ -21,11 +24,11 @@ import {
 } from './middleware';
 import { api } from './routes/api';
 import { serveSpa } from './routes/pages';
-import type { ServerEnv } from './env';
+import { appContext, type ServerEnv } from './env';
 
 export { ChangeHub } from './hub';
 
-// One Worker fetch, one Hono route tree. SDKs handle only their protocol endpoints.
+// One Worker fetch, one Hono route tree. The OAuth SDK handles only its protocol endpoints.
 const app = new Hono<ServerEnv>();
 app.use('*', securityHeaders, requestContext);
 app.onError((error, c) => {
@@ -57,13 +60,18 @@ app.use('/auth/*', authRateLimit, sameOriginMutation);
 app.post('/auth/:purpose/options', (c) => {
   const purpose = c.req.param('purpose');
   assert(['bootstrap', 'recovery', 'login', 'add'].includes(purpose), 404, 'Not found');
-  return options(c.req.raw, c.env, purpose);
+  return options(c.req.raw, c.env, purpose, c.get('authState'));
 });
 app.post('/auth/:purpose/finish', (c) => {
   const purpose = c.req.param('purpose');
   assert(['bootstrap', 'recovery', 'login', 'add'].includes(purpose), 404, 'Not found');
   const origin = c.get('authState').canonical_origin;
-  return finish(c.req.raw, origin ? withOAuth(c.env, c.get('authState')) : c.env, purpose);
+  return finish(
+    c.req.raw,
+    origin && purpose === 'recovery' ? withOAuth(c.env, c.get('authState')) : c.env,
+    purpose,
+    c.get('authState'),
+  );
 });
 app.post('/auth/consent', requireSetup, requireSession, (c) => {
   const origin = c.get('authState').canonical_origin!;
@@ -73,7 +81,8 @@ app.post('/authorize', requireSession, sameOriginMutation, (c) => {
   return submitConsent(c.req.raw, withOAuth(c.env, c.get('authState')), c.get('user'));
 });
 
-// OAuth protocol endpoints and the protected MCP transport stay inside the supported SDK.
+// OAuth protocol endpoints stay inside the supported SDK, which also authenticates /mcp before
+// handing it to the hand-rolled MCP endpoint.
 app.use('/oauth/*', authRateLimit);
 for (const route of ['/oauth/*', '/.well-known/*', '/mcp'])
   app.all(route, requireSetup, async (c) => {
@@ -98,7 +107,8 @@ for (const route of ['/oauth/*', '/.well-known/*', '/mcp'])
       c.env,
       c.executionCtx as ExecutionContext,
       c.get('authState'),
-      (incoming, owner) => handleMcp(incoming, c.env, owner),
+      (incoming, owner) =>
+        handleMcp(incoming, owner, () => createServices(appContext(c.env, owner.authEpoch))),
     );
   });
 

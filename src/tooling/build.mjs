@@ -2,6 +2,7 @@ import { cp, mkdir, readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { build } from 'esbuild';
 import { build as buildWeb } from 'vite';
+import { generateToolList } from './mcp-tools.mjs';
 
 const root = new URL('../../', import.meta.url);
 const path = (relative) => fileURLToPath(new URL(relative, root));
@@ -23,6 +24,9 @@ for (const name of ['fonts', 'icons', 'translations', 'embed-icons', 'LICENSE.md
     recursive: true,
   });
 }
+
+// The Worker imports the generated tools/list, so it is refreshed before bundling.
+await generateToolList();
 
 // Integration tests run this bundle. Deployment lets Wrangler bundle the same Worker source.
 await build({

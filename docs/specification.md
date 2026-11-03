@@ -772,7 +772,7 @@ React + TypeScript + Vite, with the pinned tldraw canvas engine. Account pages a
 
 **Backend**
 
-One Cloudflare Worker, with Hono Browser API routes and SDK-managed MCP/OAuth transport.
+One Cloudflare Worker, with Hono Browser API routes, SDK-managed OAuth and a hand-rolled stateless MCP endpoint.
 
 **Structured Storage**
 
