@@ -1,51 +1,49 @@
-:root {
+.auth-page {
   font-family: system-ui, sans-serif;
   color: #17191c;
   background: #fafaf8;
   line-height: 1.6;
   color-scheme: light;
 }
-* {
+.auth-page,
+.auth-page * {
   box-sizing: border-box;
-}
-body {
-  margin: 0;
 }
 .auth-page {
   max-width: 640px;
   margin: 7vh auto;
   padding: 28px;
 }
-.brand {
+.auth-page .brand {
   font-size: 14px;
   font-weight: 650;
   text-decoration: none;
   color: #5f6670;
 }
-h1 {
+.auth-page h1 {
   font-size: 30px;
   line-height: 1.2;
   margin: 24px 0;
 }
-p {
+.auth-page p {
   overflow-wrap: anywhere;
 }
-a {
+.auth-page a {
   color: #2b59c3;
 }
-label {
+.auth-page label {
   display: block;
   margin: 16px 0;
 }
-code {
+.auth-page code {
   overflow-wrap: anywhere;
   font-size: 0.9em;
 }
-input,
-button {
+.auth-page input,
+.auth-page button {
   font: inherit;
 }
-input[type='password'] {
+.auth-page input[type='password'] {
   display: block;
   width: 100%;
   padding: 12px;
@@ -54,17 +52,17 @@ input[type='password'] {
   margin-top: 8px;
   background: white;
 }
-.check {
+.auth-page .check {
   padding: 8px 0;
   min-height: 44px;
 }
-.check input {
+.auth-page .check input {
   width: 20px;
   height: 20px;
   vertical-align: middle;
   margin-right: 8px;
 }
-button {
+.auth-page button {
   min-height: 44px;
   padding: 10px 18px;
   border: 1px solid #2b59c3;
@@ -73,32 +71,32 @@ button {
   color: white;
   cursor: pointer;
 }
-button:disabled {
+.auth-page button:disabled {
   opacity: 0.6;
   cursor: wait;
 }
-.secondary {
+.auth-page .secondary {
   background: white;
   color: #2b59c3;
 }
-.actions {
+.auth-page .actions {
   display: flex;
   gap: 12px;
   margin-top: 24px;
 }
-:focus-visible {
+.auth-page :focus-visible {
   outline: 3px solid #2b59c3;
   outline-offset: 3px;
 }
-[role='status'] {
+.auth-page [role='status'] {
   white-space: pre-wrap;
   color: #5f6670;
 }
-ul {
+.auth-page ul {
   list-style: none;
   padding: 0;
 }
-li {
+.auth-page li {
   border-bottom: 1px solid #e3e3de;
   padding: 12px 0 20px;
 }

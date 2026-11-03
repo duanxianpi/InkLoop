@@ -1,3 +1,5 @@
+import { assert } from '../http/errors';
+export { assert, HttpError } from '../http/errors';
 import type { OAuthHelpers } from '@cloudflare/workers-oauth-provider';
 export interface Env {
   ASSETS: Fetcher;
@@ -39,53 +41,6 @@ export async function state(env: Env): Promise<State> {
     'SELECT initialized_at,auth_epoch,canonical_origin,rp_id FROM auth_state WHERE id=1',
   ).first<State>())!;
 }
-export class HttpError extends Error {
-  constructor(
-    public status: number,
-    message: string,
-  ) {
-    super(message);
-  }
-}
-export function assert(value: unknown, status = 400, message = 'Request rejected'): asserts value {
-  if (!value) throw new HttpError(status, message);
-}
-export async function boundedText(request: Request): Promise<string> {
-  const reader = request.body?.getReader();
-  assert(reader);
-  let length = 0;
-  const chunks: Uint8Array[] = [];
-  for (;;) {
-    const { value, done } = await reader.read();
-    if (done) break;
-    length += value.byteLength;
-    if (length > 65536) {
-      await reader.cancel();
-      throw new HttpError(413, 'Request too large');
-    }
-    chunks.push(value);
-  }
-  const bytes = new Uint8Array(length);
-  let offset = 0;
-  for (const chunk of chunks) {
-    bytes.set(chunk, offset);
-    offset += chunk.length;
-  }
-  return new TextDecoder().decode(bytes);
-}
-export async function body(request: Request): Promise<any> {
-  assert(
-    request.headers.get('content-type')?.split(';')[0] === 'application/json',
-    415,
-    'JSON required',
-  );
-  const text = await boundedText(request);
-  try {
-    return JSON.parse(text);
-  } catch {
-    throw new HttpError(400, 'Invalid JSON');
-  }
-}
 export function csrf(request: Request, origin: string) {
   assert(request.headers.get('Origin') === origin, 403, 'Origin rejected');
   assert(
@@ -103,3 +58,5 @@ export async function session(request: Request, env: Env) {
     .bind(await digest(token), now())
     .first<{ owner_id: number; auth_epoch: number; created_at: number; digest: string }>();
 }
+
+export type OwnerSession = NonNullable<Awaited<ReturnType<typeof session>>>;

@@ -5,7 +5,7 @@ import { McpServer, createMcpHandler } from '@modelcontextprotocol/server';
 
 const { createProblemsInput } = await loadSource('src/shared/schemas.ts');
 const { LIMITS } = await loadSource('src/shared/limits.ts');
-const { boundedBytes, boundedJson } = await loadSource('src/server/routes/body.ts');
+const { boundedBytes, boundedJson } = await loadSource('src/server/http/body.ts');
 const base = { request_id: 'retry-1', problems: [{ title: 'Question', body: 'Explain this.' }] };
 
 test('problem destination is unambiguous at both hierarchy levels', () => {

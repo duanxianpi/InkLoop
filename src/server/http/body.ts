@@ -1,10 +1,10 @@
-import { DomainError } from '../../shared/errors';
+import { HttpError } from './errors';
 
 /** Enforce actual streamed bytes, including requests without a trustworthy Content-Length. */
 export async function boundedBytes(request: Request, limit: number): Promise<ArrayBuffer> {
   if (Number(request.headers.get('Content-Length')) > limit) {
     await request.body?.cancel();
-    throw new DomainError('payload_too_large');
+    throw new HttpError(413, 'Request body exceeds the configured limit');
   }
   const reader = request.body?.getReader();
   if (!reader) return new ArrayBuffer(0);
@@ -17,7 +17,7 @@ export async function boundedBytes(request: Request, limit: number): Promise<Arr
       length += value.byteLength;
       if (length > limit) {
         await reader.cancel();
-        throw new DomainError('payload_too_large');
+        throw new HttpError(413, 'Request body exceeds the configured limit');
       }
       chunks.push(value);
     }
@@ -37,12 +37,21 @@ export async function boundedJson(request: Request, limit: number): Promise<unkn
   if (
     request.headers.get('Content-Type')?.split(';')[0].trim().toLowerCase() !== 'application/json'
   ) {
-    throw new DomainError('invalid_request', 'Content-Type must be application/json');
+    throw new HttpError(415, 'Content-Type must be application/json');
   }
+  const text = await boundedText(request, limit);
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new HttpError(400, 'Invalid JSON');
+  }
+}
+
+export async function boundedText(request: Request, limit: number): Promise<string> {
   const bytes = await boundedBytes(request, limit);
   try {
-    return JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
+    return new TextDecoder('utf-8', { fatal: true }).decode(bytes);
   } catch {
-    throw new DomainError('invalid_request', 'Invalid JSON');
+    throw new HttpError(400, 'Invalid UTF-8');
   }
 }

@@ -11,6 +11,7 @@ export const LIMITS = {
   createProblemsBatch: 50,
   listPageSize: 100,
   // Includes JSON-RPC framing and JSON escaping for the largest permitted problem batch.
+  authRequestBytes: 64 * 1024,
   mcpRequestBytes: 8 * 1024 * 1024,
   // Byte limits apply to the complete HTTP body, including JSON envelopes.
   canvasDocumentBytes: 4 * 1024 * 1024,

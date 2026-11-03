@@ -1,10 +1,11 @@
-import { assert, body, boundedText, csrf, json, now, random, session, type Env } from './common';
+import { assert, json, now, random, type Env, type OwnerSession } from './common';
+import { boundedJson, boundedText } from '../http/body';
+import { LIMITS } from '../../shared/limits';
 import type { ConsentData } from '../../shared/auth';
 
 /** Parse only server-validated OAuth context; the client never selects its own redirect destination. */
 export async function prepareConsent(request: Request, env: Env, origin: string) {
-  csrf(request, origin);
-  const data = await body(request);
+  const data = (await boundedJson(request, LIMITS.authRequestBytes)) as any;
   assert(
     typeof data.query === 'string' && data.query.length <= 16384,
     400,
@@ -27,20 +28,17 @@ export async function prepareConsent(request: Request, env: Env, origin: string)
   return json(result, 200, consent.headers);
 }
 
-export async function submitConsent(request: Request, env: Env, origin: string) {
-  const user = await session(request, env);
-  assert(user, 401, 'Owner sign-in required');
-  csrf(request, origin);
-  const form = new URLSearchParams(await boundedText(request));
+export async function submitConsent(request: Request, env: Env, user: OwnerSession) {
+  const form = new URLSearchParams(await boundedText(request, LIMITS.authRequestBytes));
   const handle = String(form.get('handle') ?? '');
   if (form.get('decision') !== 'approve') {
     const denied = await env.OAUTH_PROVIDER.denyConsent(request, handle);
     denied.headers.delete('Location');
     return json({ redirectTo: denied.redirectTo }, 200, denied.headers);
   }
-  const approved = await env.OAUTH_PROVIDER.approveConsent(request, handle, {
-    scope: form.getAll('scope').map(String),
-  });
+  const scopes = form.getAll('scope').map(String);
+  assert(scopes.includes('mcp:read'), 400, 'mcp:read is required to connect this application');
+  const approved = await env.OAUTH_PROVIDER.approveConsent(request, handle, { scope: scopes });
   const authorizationId = random();
   const { redirectTo } = await env.OAUTH_PROVIDER.completeAuthorization({
     request: approved.request,
@@ -65,11 +63,7 @@ export async function submitConsent(request: Request, env: Env, origin: string) 
   return json({ redirectTo }, 200, approved.headers);
 }
 
-export async function listGrants(
-  request: Request,
-  env: Env,
-  user: NonNullable<Awaited<ReturnType<typeof session>>>,
-) {
+export async function listGrants(request: Request, env: Env, user: OwnerSession) {
   const url = new URL(request.url);
   const after = url.searchParams.get('cursor') ?? '';
   const rows = (
@@ -90,13 +84,9 @@ export async function listGrants(
   });
 }
 
-export async function revokeGrant(
-  request: Request,
-  env: Env,
-  user: NonNullable<Awaited<ReturnType<typeof session>>>,
-) {
+export async function revokeGrant(request: Request, env: Env, user: OwnerSession) {
   assert(user!.created_at > now() - 300, 401, 'Reauthentication required');
-  const data = await body(request);
+  const data = (await boundedJson(request, LIMITS.authRequestBytes)) as any;
   assert(typeof data.grantId === 'string');
   const selected = await env.DB.prepare(
     'SELECT authorization_id FROM connected_apps WHERE authorization_id=? AND auth_epoch=?',

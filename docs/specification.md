@@ -768,7 +768,7 @@ Use a single Cloudflare-hosted application.
 
 **Frontend**
 
-React + TypeScript + Vite, with the pinned tldraw canvas engine. Account pages and the product entry belong to one client-rendered React SPA; Hono serves pages, static assets and APIs.
+React + TypeScript + Vite, with the pinned tldraw canvas engine. Account pages and the product entry belong to one client-rendered React SPA; Hono serves page shells and APIs; Cloudflare Static Assets serves public assets directly.
 
 **Backend**
 

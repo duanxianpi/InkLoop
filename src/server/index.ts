@@ -1,6 +1,12 @@
 import { Hono } from 'hono';
 import { AuthorizationError, CimdFetchError } from '@cloudflare/workers-oauth-provider';
-import { assert, boundedText, HttpError, json, setCookie } from './auth/common';
+import { assert, json, setCookie } from './auth/common';
+import { boundedText } from './http/body';
+import { errorResponse, HttpError } from './http/errors';
+import { DomainError } from '../shared/errors';
+import { LIMITS } from '../shared/limits';
+import { PAGES } from '../shared/pages';
+import { handleMcp } from './mcp/handler';
 import { ensureBootstrap, finish, options } from './auth/owner';
 import { listGrants, prepareConsent, revokeGrant, submitConsent } from './auth/handlers';
 import { handleOAuth, withOAuth } from './auth/oauth';
@@ -23,29 +29,27 @@ export { ChangeHub } from './hub';
 const app = new Hono<ServerEnv>();
 app.use('*', securityHeaders, requestContext);
 app.onError((error, c) => {
-  if (error instanceof HttpError) return json({ error: error.message }, error.status);
+  if (error instanceof HttpError || error instanceof DomainError) return errorResponse(error);
   if (error instanceof AuthorizationError || error instanceof CimdFetchError)
-    return json({ error: 'Invalid OAuth request' }, 400);
+    return json({ error: 'invalid_request', message: 'Invalid OAuth request' }, 400);
   console.error('request_failed', error.name);
   return c.json({ error: 'internal_error' }, 500);
 });
 app.notFound((c) => c.json({ error: 'not_found' }, 404));
 
-// Ordinary build assets are public code; user data remains behind authenticated APIs.
-app.get('/assets/*', (c) => c.env.ASSETS.fetch(c.req.raw));
-app.get('/setup', async (c) => {
-  await ensureBootstrap(c.env);
-  return serveSpa(c);
-});
-app.get('/login', serveSpa);
-app.get('/recover', serveSpa);
-app.on(
-  'GET',
-  ['/', '/app', '/settings/passkeys/add', '/settings/connected-apps'],
-  requirePageSession,
-  serveSpa,
-);
-app.get('/authorize', authRateLimit, requireSetup, requirePageSession, serveSpa);
+// Matching /assets/* files are served by Cloudflare's asset layer before this Worker.
+// A missing asset must stay a 404; it must never fall through to the SPA shell.
+app.use('/setup', authRateLimit);
+app.use('/authorize', authRateLimit, requireSetup);
+for (const page of PAGES) {
+  if (page.access === 'session') app.get(page.path, requirePageSession, serveSpa);
+  else if (page.purpose === 'bootstrap')
+    app.get(page.path, async (c) => {
+      if (!c.get('authState').initialized_at) await ensureBootstrap(c.env);
+      return serveSpa(c);
+    });
+  else app.get(page.path, serveSpa);
+}
 
 // Public setup state and the Passkey ceremonies. Ceremony handlers perform their own proof checks.
 app.get('/api/status', (c) => c.json({ initialized: !!c.get('authState').initialized_at }));
@@ -59,15 +63,14 @@ app.post('/auth/:purpose/finish', (c) => {
   const purpose = c.req.param('purpose');
   assert(['bootstrap', 'recovery', 'login', 'add'].includes(purpose), 404, 'Not found');
   const origin = c.get('authState').canonical_origin;
-  return finish(c.req.raw, origin ? withOAuth(c.env, origin) : c.env, purpose);
+  return finish(c.req.raw, origin ? withOAuth(c.env, c.get('authState')) : c.env, purpose);
 });
 app.post('/auth/consent', requireSetup, requireSession, (c) => {
   const origin = c.get('authState').canonical_origin!;
-  return prepareConsent(c.req.raw, withOAuth(c.env, origin), origin);
+  return prepareConsent(c.req.raw, withOAuth(c.env, c.get('authState')), origin);
 });
-app.post('/authorize', authRateLimit, requireSetup, requireSession, sameOriginMutation, (c) => {
-  const origin = c.get('authState').canonical_origin!;
-  return submitConsent(c.req.raw, withOAuth(c.env, origin), origin);
+app.post('/authorize', requireSession, sameOriginMutation, (c) => {
+  return submitConsent(c.req.raw, withOAuth(c.env, c.get('authState')), c.get('user'));
 });
 
 // OAuth protocol endpoints and the protected MCP transport stay inside the supported SDK.
@@ -80,9 +83,23 @@ for (const route of ['/oauth/*', '/.well-known/*', '/mcp'])
       const requestOrigin = c.req.header('Origin');
       assert(!requestOrigin || requestOrigin === origin, 403, 'Origin rejected');
     } else if (c.req.method === 'POST') {
-      request = new Request(request, { body: await boundedText(request) });
+      try {
+        request = new Request(request, {
+          body: await boundedText(request, LIMITS.authRequestBytes),
+        });
+      } catch (error) {
+        if (error instanceof HttpError)
+          return json({ error: 'invalid_request', error_description: error.message }, error.status);
+        throw error;
+      }
     }
-    return handleOAuth(request, c.env, c.executionCtx as ExecutionContext, origin);
+    return handleOAuth(
+      request,
+      c.env,
+      c.executionCtx as ExecutionContext,
+      c.get('authState'),
+      (incoming, owner) => handleMcp(incoming, c.env, owner),
+    );
   });
 
 app.post('/logout', requireSession, sameOriginMutation, async (c) => {
@@ -98,7 +115,7 @@ app.get('/api/me', (c) =>
 );
 app.get('/api/grants', (c) => listGrants(c.req.raw, c.env, c.get('user')));
 app.post('/api/grants/revoke', (c) =>
-  revokeGrant(c.req.raw, withOAuth(c.env, c.get('authState').canonical_origin!), c.get('user')),
+  revokeGrant(c.req.raw, withOAuth(c.env, c.get('authState')), c.get('user')),
 );
 app.route('/api', api);
 

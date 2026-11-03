@@ -6,7 +6,7 @@ import {
   getSubmissionInput,
   listProblemsInput,
 } from '../../shared/schemas';
-import { HttpError } from '../auth/common';
+import { errorPayload, HttpError } from '../http/errors';
 import type { McpIdentity } from '../auth/types';
 import type { Services } from '../services';
 
@@ -22,12 +22,7 @@ async function run(
   try {
     return await action();
   } catch (error) {
-    const failure =
-      error instanceof DomainError
-        ? { error: error.code, message: error.message, ...error.details }
-        : error instanceof HttpError
-          ? { error: error.status === 403 ? 'forbidden' : 'unauthorized', message: error.message }
-          : { error: 'internal_error' };
+    const failure = errorPayload(error);
     if (!(error instanceof DomainError || error instanceof HttpError))
       console.error('mcp_tool_error', (error as Error)?.name);
     return { isError: true, content: [text(failure)], structuredContent: failure };

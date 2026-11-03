@@ -19,13 +19,13 @@ npx wrangler login
 npm run deploy
 ```
 
-`src/tooling/deploy.mjs` first attempts D1 migrations. If the database has not been provisioned, it deploys a maintenance entry that returns 503, provisions bindings, applies migrations, and then publishes the real Worker. Other migration failures stop deployment. The maintenance entry also exports ChangeHub to match the shared Wrangler configuration.
+`src/tooling/deploy.mjs` first builds fresh frontend assets and validates the Worker bundle. A failed build stops before any cloud operation. It then attempts D1 migrations. If the database has not been provisioned, it deploys a maintenance entry that returns 503, provisions bindings, applies migrations, and then publishes the real Worker. Other migration failures stop deployment. The maintenance entry also exports ChangeHub to match the shared Wrangler configuration.
 
-Build before deploy: `dist/public/` must contain the SPA HTML and its hashed JS/CSS assets. The deploy command uses Wrangler to bundle Worker source. Keep generated local binding state for subsequent deployments and verify you are targeting the existing resources before an upgrade.
+The deploy command regenerates `dist/public/`, including versioned drawing assets, and uses Wrangler to bundle Worker source. A standalone `npm run deploy` cannot silently reuse stale frontend output. Keep generated local binding state for subsequent deployments and verify you are targeting the existing resources before an upgrade.
 
 ## Git-connected deployment
 
-Import your copy of this repository into Cloudflare Workers using its Git integration. Configure `npm run build` as the build command and `npm run deploy` as the deploy command. Use the repository's `wrangler.jsonc` and migrations. Complete any platform prompts for resource availability, including R2.
+Import your copy of this repository into Cloudflare Workers using its Git integration. Configure `npm run typecheck` as the build command and `npm run deploy` as the deploy command. The deploy script performs the actual asset build before migration or publication. Use the repository's `wrangler.jsonc` and migrations. Complete any platform prompts for resource availability, including R2.
 
 This describes the intended Whiteboard deployment procedure. A new full deployment of this React-auth revision has not yet been accepted end-to-end; local tests do not substitute for that release check.
 

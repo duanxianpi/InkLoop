@@ -1,3 +1,5 @@
+import { boundedJson } from '../http/body';
+import { LIMITS } from '../../shared/limits';
 import {
   generateRegistrationOptions,
   verifyRegistrationResponse,
@@ -6,7 +8,6 @@ import {
 } from '@simplewebauthn/server';
 import {
   assert,
-  body,
   cookie,
   csrf,
   digest,
@@ -67,7 +68,7 @@ function confirmedOrigin(value: unknown, request: Request) {
 }
 export async function options(request: Request, env: Env, purpose: string) {
   const s = await state(env);
-  const data = await body(request);
+  const data = (await boundedJson(request, LIMITS.authRequestBytes)) as any;
   csrf(request, s.canonical_origin ?? new URL(request.url).origin);
   const headers = new Headers();
   const browser = cookie(request, '__Host-ceremony') || random();
@@ -126,7 +127,7 @@ export async function options(request: Request, env: Env, purpose: string) {
 }
 export async function finish(request: Request, env: Env, purpose: string) {
   const s = await state(env);
-  const data = await body(request);
+  const data = (await boundedJson(request, LIMITS.authRequestBytes)) as any;
   csrf(request, s.canonical_origin ?? new URL(request.url).origin);
   assert(typeof data.id === 'string' && data.response?.id);
   const browserDigest = await digest(cookie(request, '__Host-ceremony'));

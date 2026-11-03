@@ -6,19 +6,19 @@ Whiteboard uses one Hono application as the Worker's fetch handler. Authenticati
 
 `src/server/index.ts` owns the top-level routes. `src/server/middleware.ts` provides canonical-origin checks, authentication rate limiting, session checks, mutation CSRF checks and response security headers.
 
-| Route                                                       | Handler and access                                                                                          |
-| ----------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| `/setup`, `/login`, `/recover`                              | Public React SPA shell; setup also initializes the bootstrap key if needed                                  |
-| `/`, `/app`, `/settings/*` (registered pages)               | SPA shell after session check; unauthenticated users are redirected to login with a same-origin return path |
-| `GET /authorize`                                            | SPA shell after setup/session checks; preserves the incoming authorization query                            |
-| `/assets/*`                                                 | Ordinary public build assets; contains application code, not owner data                                     |
-| `GET /api/status`                                           | Public initialized flag only                                                                                |
-| `POST /auth/:purpose/options`, `POST /auth/:purpose/finish` | Passkey handlers with Origin, ceremony and purpose-specific proof checks                                    |
-| `POST /auth/consent`                                        | Session/CSRF-protected preparation of an OAuth consent transaction                                          |
-| `POST /authorize`                                           | Session/CSRF-protected approval or denial; returns SDK-validated `redirectTo` as JSON                       |
-| `/oauth/*`, `/.well-known/*`, `/mcp`                        | Explicitly forwarded to the OAuth SDK; MCP then dispatches the registered tools                             |
-| `/api/me`, `/api/grants`, `/api/grants/revoke`, `/logout`   | Authenticated account operations; mutations require matching Origin                                         |
-| Remaining `/api/*`                                          | Authenticated Hono product router; mutations require matching Origin                                        |
+| Route                                                       | Handler and access                                                                                               |
+| ----------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `/setup`, `/login`, `/recover`                              | Public React SPA shell; setup is rate limited and initializes the bootstrap key only before owner initialization |
+| `/`, `/app`, `/settings/*` (registered pages)               | SPA shell after session check; unauthenticated users are redirected to login with a same-origin return path      |
+| `GET /authorize`                                            | SPA shell after setup/session checks; preserves the incoming authorization query                                 |
+| `/assets/*`                                                 | Cloudflare Static Assets serves public files directly, with immutable caching; no Worker/D1 request              |
+| `GET /api/status`                                           | Public initialized flag only                                                                                     |
+| `POST /auth/:purpose/options`, `POST /auth/:purpose/finish` | Passkey handlers with Origin, ceremony and purpose-specific proof checks                                         |
+| `POST /auth/consent`                                        | Session/CSRF-protected preparation of an OAuth consent transaction                                               |
+| `POST /authorize`                                           | Session/CSRF-protected approval or denial; returns SDK-validated `redirectTo` as JSON                            |
+| `/oauth/*`, `/.well-known/*`, `/mcp`                        | Explicitly forwarded to the OAuth SDK; MCP then dispatches the registered tools                                  |
+| `/api/me`, `/api/grants`, `/api/grants/revoke`, `/logout`   | Authenticated account operations; mutations require matching Origin                                              |
+| Remaining `/api/*`                                          | Authenticated Hono product router; mutations require matching Origin                                             |
 
 Unregistered URLs return 404, rather than silently becoming SPA pages. `/index.html` is an internal asset lookup, not an alternative public page route. Private API requests return 401 rather than HTML redirects.
 
@@ -26,7 +26,7 @@ Product writes must recheck the auth epoch inside the database operation. A requ
 
 ## React SPA
 
-`src/web/main.tsx` mounts the application with `createRoot`. `App.tsx` chooses the page from the URL. Account components live in `src/web/auth/`; the product canvas currently remains an empty entry.
+`src/web/main.tsx` mounts the application with `createRoot`. `App.tsx` chooses the page from `src/shared/pages.ts`, which also registers Hono page routes. Account components live in `src/web/auth/`; the product canvas currently remains an empty entry.
 
 Every registered page receives the same static `index.html`. Vite builds ordinary hashed JavaScript and CSS under `dist/public/assets/`. There is no server React rendering, hydration, injected page data, dedicated `auth.js`, or script inlining.
 
@@ -39,10 +39,12 @@ The shell and static JavaScript contain no private owner data. Page access check
 1. The client sends the browser to `/authorize?...`. Hono requires a session, preserving the query through login.
 2. React sends that query to `POST /auth/consent` with same-origin credentials.
 3. The server uses SDK helpers to validate the client, redirect, requested scopes and resource. It returns display metadata and a consent handle, together with the SDK's consent cookie.
-4. React shows that validated context. Approve/deny submits the handle and selected scopes to `POST /authorize`.
+4. React shows that validated context with mandatory `mcp:read` and optional write access. Approve/deny submits the handle and selected scopes to `POST /authorize`.
 5. The server verifies the session, Origin and SDK consent transaction, records the grant or denial, and returns the validated destination. React navigates to that URL.
 
-The browser never supplies a trusted redirect destination of its own. Invalid or replayed consent transactions fail on the server. SDK helpers are obtained directly through `getOAuthApi`; routing does not pass through a second application dispatcher. The SDK remains responsible for protocol-owned discovery, registration, token and MCP bearer-token handling.
+The server rejects approvals without `mcp:read` before consuming the consent handle. Consent handlers reuse the middleware session and Origin checks. The browser never supplies a trusted redirect destination of its own. Invalid or replayed consent transactions fail on the server. SDK helpers are obtained directly through `getOAuthApi`; routing does not pass through a second application dispatcher. The SDK remains responsible for protocol-owned discovery, registration, token and MCP bearer-token handling.
+
+The root router injects the authenticated MCP handler into the OAuth adapter; auth code does not construct product services or tools. OAuth callbacks reuse the current request's auth-state read, with a separate D1 revocation lookup. Authorization state is never cached across requests. Product writes still need their own transactional epoch guards.
 
 ## Owner lifecycle
 

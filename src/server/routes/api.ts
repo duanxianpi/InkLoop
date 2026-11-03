@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { boundedBytes, boundedJson } from './body';
+import { boundedBytes, boundedJson } from '../http/body';
 import { z } from 'zod';
 import { DomainError } from '../../shared/errors';
 import { LIMITS } from '../../shared/limits';
@@ -9,7 +9,7 @@ import {
   preferencesInput,
   saveCanvasInput,
 } from '../../shared/schemas';
-import { HttpError } from '../auth/common';
+import { errorResponse, HttpError } from '../http/errors';
 import { appContext, changeHub, type ServerEnv } from '../env';
 import { createServices } from '../services';
 
@@ -23,11 +23,9 @@ api.use('*', async (c, next) => {
 });
 
 api.onError((error, c) => {
-  if (error instanceof DomainError)
-    return c.json({ error: error.code, message: error.message, ...error.details }, error.status);
+  if (error instanceof DomainError || error instanceof HttpError) return errorResponse(error);
   if (error instanceof z.ZodError)
     return c.json({ error: 'invalid_request', issues: error.issues.slice(0, 10) }, 400);
-  if (error instanceof HttpError) return c.json({ error: error.message }, error.status as 400);
   return c.json({ error: 'internal_error' }, 500);
 });
 api.notFound((c) => c.json({ error: 'not_found' }, 404));

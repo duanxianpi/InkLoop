@@ -1,0 +1,4 @@
+/* Shared document reset; account-specific styles remain inside .auth-page. */
+body {
+  margin: 0;
+}

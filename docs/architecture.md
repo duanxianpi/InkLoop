@@ -1,6 +1,6 @@
 # Agent Whiteboard — Final Architecture
 
-Architecture baseline: 2026-11-02. “Final” identifies the selected structure and contracts for the next implementation stage; it does not mean the product is complete.
+Architecture baseline: 2026-11-03 (audit corrections applied). “Final” identifies the selected structure and contracts for the next implementation stage; it does not mean the product is complete.
 
 ## 1. Product and scope
 
@@ -31,13 +31,14 @@ Local tests establish the foundation's behavior, not the correctness of future p
 
 ## 3. Runtime topology
 
-One Cloudflare Worker exports a Hono application as its fetch handler. Hono owns the route tree for pages, static assets, account APIs, product APIs and SDK protocol endpoints. There is no outer authentication dispatcher or external auth service.
+One Cloudflare Worker exports a Hono application as its fetch handler. Hono owns the route tree for pages, account APIs, product APIs and SDK protocol endpoints. Matching `/assets/*` files are served directly by Cloudflare Static Assets, without invoking the Worker or querying D1. There is no outer authentication dispatcher or external auth service.
 
 ```mermaid
 flowchart TD
     Browser[Owner browser: React SPA] --> Hono[Worker fetch: Hono router]
+    Browser -->|/assets/*| Static[Cloudflare Static Assets: immutable public files]
     Agent[AI client: Remote MCP] --> Hono
-    Hono --> Assets[Static HTML and hashed JS/CSS]
+    Hono --> Assets[Static HTML shell via ASSETS binding]
     Hono --> Auth[Passkey and consent handlers]
     Hono --> SDK[OAuth and MCP SDK endpoints]
     Hono --> Web[Authenticated product API router]
@@ -61,6 +62,8 @@ D1 is authoritative for structured state and committed pointers. R2 holds object
 | `src/server/index.ts`         | Hono top-level route table and Worker entry                                             |
 | `src/server/middleware.ts`    | Request context, sessions, CSRF, rate limits and security headers                       |
 | `src/server/auth/`            | Passkey ceremonies, consent/grant handlers and OAuth SDK integration; no HTML rendering |
+| `src/server/http/`            | Shared bounded body readers and stable HTTP/MCP application error mapping               |
+| `src/shared/pages.ts`         | Page registry shared by Hono and React                                                  |
 | `src/server/routes/`          | Static SPA shell handler and mounted product API router                                 |
 | `src/server/mcp/`             | Tool definitions, scope checks, service dispatch and image content blocks               |
 | `src/server/services/`        | Shared product service interfaces; future business invariants                           |
@@ -74,15 +77,19 @@ D1 is authoritative for structured state and committed pointers. R2 holds object
 
 Services must not depend on HTTP requests, Hono contexts or MCP servers. Transport adapters must not implement competing versions of the save/submit state machine. Browser components never import database or server authentication modules. The Worker never imports React components.
 
-As product implementation grows, add `src/web/canvas/` for the thin tldraw adapter, `src/web/sync/` for local persistence/save queues, and focused service/repository modules. These directories are planned boundaries, not empty scaffolding that must be populated in advance. No generic repository framework or multi-package platform is required.
+`src/web/canvas/assets.ts` already defines local drawing asset URLs. As product implementation grows, extend that directory with the thin tldraw adapter. Add `src/web/sync/` for local persistence/save queues and focused service/repository modules as needed. These directories are planned boundaries, not empty scaffolding that must be populated in advance. No generic repository framework or multi-package platform is required.
 
 ## 5. Authentication and React SPA
 
 Hono middleware resolves the owner and checks same-origin mutations before private handlers run. Web requests use an HttpOnly secure session cookie. MCP uses OAuth, `mcp:read`, additional `mcp:write` for mutation tools, current auth epoch and per-grant revocation checks. The OAuth SDK handles only the explicitly mounted protocol routes; it does not wrap the application.
 
-Account pages and the product entry share one client-rendered React application. Hono serves the same static HTML shell for known page URLs and public hashed JS/CSS under `/assets/*`. Private data comes from protected APIs. There is no SSR, hydration, dedicated auth bundle or inline script injection.
+Account pages and the product entry share one client-rendered React application. Hono serves the same static HTML shell for known page URLs from the shared page registry. Cloudflare serves public hashed JS/CSS under `/assets/*` directly. Private data comes from protected APIs. There is no SSR, hydration, dedicated auth bundle or inline script injection.
 
 Passkey interactions call browser APIs, then send results to backend verification. The consent page fetches validated OAuth context from `POST /auth/consent`, submits its decision to `POST /authorize`, and follows the server-returned, SDK-validated redirect. Consent handles, cookies, scopes, Origin and session checks remain server-enforced. React escapes external display text; no private data is embedded in the HTML shell.
+
+OAuth integration receives an authenticated MCP handler from the root router. It imports no product services or MCP tool implementation. The request's auth-state snapshot is reused for token/grant validation and metadata; revocation still requires its own authoritative D1 lookup. There is no cross-request authorization cache. Consent submission receives the session already checked by middleware, and `mcp:read` is mandatory in both UI and server validation. `/setup` is rate limited and skips bootstrap initialization writes once setup is complete.
+
+HTML and default API responses use `no-store`. Fingerprinted static assets use `public, max-age=31536000, immutable` through `_headers`. Explicit route cache policies survive middleware, including private immutable Snapshot images: once implemented, such images may remain in the owner's browser cache after session revocation. Their URLs must identify immutable content. Unknown asset paths and direct `/index.html` requests return 404.
 
 Auth source is a maintained Whiteboard adaptation of the upstream template. Updates are reviewed merges, not source synchronization. See [Authentication](auth-integration.md) for the route table and lifecycle.
 
@@ -182,11 +189,11 @@ The hub must enforce auth-epoch changes and define bounded socket lifetime/reval
 
 Inputs and results are centralized in `src/shared/schemas.ts` and `model.ts`. Create destinations have enforced exclusive choices at both Set and Collection levels. The browser list client forwards filters and cursors rather than silently fetching only the first 100 records.
 
-MCP has an 8 MiB body budget; canvas JSON, PNG and preferences have 4 MiB, 8 MiB and 16 KiB budgets respectively. Browser limits count streamed bytes before full buffering. Auth/OAuth requests retain their separate 64 KiB limit. Field-level limits apply in addition to body budgets. See [API contracts](api.md).
+MCP has an 8 MiB body budget; canvas JSON, PNG and preferences have 4 MiB, 8 MiB and 16 KiB budgets respectively. Shared HTTP body readers count streamed bytes before full buffering and reject invalid UTF-8. HTTP and MCP application errors share stable codes plus human-readable messages; OAuth protocol errors retain SDK codes and `error_description`. Auth/OAuth requests retain their separate 64 KiB limit. Field-level limits apply in addition to body budgets. See [API contracts](api.md).
 
 ## 11. Build, formatting, deployment and documentation
 
-Vite emits the shared SPA HTML and ordinary hashed JS/CSS assets. A separate Worker bundle is generated for integration tests. Deployment uses the same source and ordered migrations, provisioning missing resources through a maintenance-only Worker before publishing the application.
+Vite emits the shared SPA HTML and ordinary hashed JS/CSS assets. The build also copies the pinned tldraw fonts, icons and translations to versioned local asset URLs, verified against the engine version. The future canvas must pass `canvasAssetUrls` to tldraw; complete canvas/CSP validation remains pending. Account styles are scoped to `.auth-page`. A separate Worker bundle is generated for integration tests. Node.js 22.12+ is required. Deployment always rebuilds successfully before any migration, provisioning or publishing, and uses the same source and ordered migrations, provisioning missing resources through a maintenance-only Worker before publishing the application.
 
 `docs/` is public and tracked. `internal/docs/` contains local planning and historical evidence and is ignored, along with experiments, prototypes and private deployment data. Public instructions must work without any ignored file or neighboring template checkout. Old Access/cf setup guides and the template source-copy workflow are retired.
 

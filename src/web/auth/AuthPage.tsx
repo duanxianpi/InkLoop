@@ -7,8 +7,8 @@ async function post<T = unknown>(path: string, value: unknown) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(value),
   });
-  const data = (await response.json()) as T & { error?: string };
-  if (!response.ok) throw new Error(data.error || 'Request failed');
+  const data = (await response.json()) as T & { error?: string; message?: string };
+  if (!response.ok) throw new Error(data.message || data.error || 'Request failed');
   return data;
 }
 
@@ -258,9 +258,13 @@ function Consent({ data }: { data: ConsentData }) {
           [...values.entries()].map(([key, value]) => [key, String(value)]),
         ),
       });
-      const result = (await response.json()) as { redirectTo?: string; error?: string };
+      const result = (await response.json()) as {
+        redirectTo?: string;
+        error?: string;
+        message?: string;
+      };
       if (!response.ok || !result.redirectTo)
-        throw new Error(result.error || 'Authorization failed');
+        throw new Error(result.message || result.error || 'Authorization failed');
       // This URL comes only from the server after the SDK validates the consent transaction.
       location.assign(result.redirectTo);
     } catch (error) {
@@ -294,8 +298,15 @@ function Consent({ data }: { data: ConsentData }) {
         <input type="hidden" name="handle" value={data.handle} />
         {data.scopes.map((scope) => (
           <label className="check" key={scope}>
-            <input type="checkbox" name="scope" value={scope} defaultChecked disabled={busy} />{' '}
-            {scope}
+            <input
+              type="checkbox"
+              name="scope"
+              value={scope}
+              defaultChecked
+              disabled={busy || scope === 'mcp:read'}
+            />
+            {scope === 'mcp:read' && <input type="hidden" name="scope" value={scope} />} {scope}
+            {scope === 'mcp:read' ? ' (required)' : ''}
           </label>
         ))}
         <div className="actions">

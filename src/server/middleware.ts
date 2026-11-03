@@ -21,7 +21,10 @@ export const authRateLimit = createMiddleware<ServerEnv>(async (c, next) => {
     const result = await c.env.AUTH_LIMITER.limit({
       key: `${new URL(c.req.url).hostname}:${c.req.header('CF-Connecting-IP') ?? 'unknown'}`,
     });
-    if (!result.success) return json({ error: 'Try again shortly' }, 429, { 'Retry-After': '60' });
+    if (!result.success)
+      return json({ error: 'rate_limited', message: 'Try again shortly' }, 429, {
+        'Retry-After': '60',
+      });
   }
   await next();
 });
@@ -59,7 +62,7 @@ export const requireSetup = createMiddleware<ServerEnv>(async (c, next) => {
 
 export const securityHeaders = createMiddleware<ServerEnv>(async (c, next) => {
   await next();
-  c.header('Cache-Control', 'no-store');
+  if (!c.res.headers.has('Cache-Control')) c.header('Cache-Control', 'no-store');
   c.header('X-Content-Type-Options', 'nosniff');
   c.header('X-Frame-Options', 'DENY');
   c.header('Referrer-Policy', 'same-origin');

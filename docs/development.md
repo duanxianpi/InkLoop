@@ -2,6 +2,8 @@
 
 ## Commands
 
+Use Node.js 22.12 or later, as required by `package.json`.
+
 ```sh
 npm ci
 npm run format:check
@@ -16,11 +18,14 @@ The current checks cover:
 
 - Worker/Web TypeScript and the browser-only React account components.
 - Real local Worker/D1/KV routing, authentication boundaries and epoch invalidation.
-- Shared static SPA shell, public hashed assets, CSP and private API isolation.
-- OAuth client registration, protected consent preparation, approval/denial/replay checks, SDK cookie/handle validation, PKCE token exchange and MCP tool discovery.
+- Shared static SPA shell, CSP and private API isolation; real Static Assets routing serves JS before auth tables exist, with immutable cache headers.
+- Explicit private cache preservation, setup throttling and pinned local drawing asset completeness.
+- Deployment build/migration/publish ordering with injected processes; failures never publish.
+- OAuth client registration, protected consent preparation, approval/denial/replay and mandatory read-scope checks, SDK cookie/handle validation, PKCE token exchange and MCP tool discovery.
 - Exclusive create destinations, filtered/paginated Web client calls and malformed JSON.
 - MCP acceptance of a large valid batch and rejection of oversized requests.
-- Streamed browser body limits, including requests without `Content-Length`.
+- Shared streamed body limits, media-type casing, invalid UTF-8 and empty/oversized OAuth requests, including requests without `Content-Length`.
+- Matching HTTP/MCP application error codes for authorization and service failures.
 
 Product services remain stubs; these checks do not validate canvas persistence or Snapshot atomicity.
 

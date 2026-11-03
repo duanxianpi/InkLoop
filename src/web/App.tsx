@@ -1,33 +1,26 @@
 import { useEffect, useState } from 'react';
 import { AuthPage } from './auth/AuthPage';
-import type { AuthPageData, ConsentData, PasskeyPurpose } from '../shared/auth';
+import type { AuthPageData, ConsentData } from '../shared/auth';
 import './auth/styles.css';
-
-const purposes: Record<string, PasskeyPurpose> = {
-  '/setup': 'bootstrap',
-  '/login': 'login',
-  '/recover': 'recovery',
-  '/settings/passkeys/add': 'add',
-};
+import { pageForPath } from '../shared/pages';
 
 /** One browser entry. Hono serves this shell and enforces access on every private API. */
 export function App() {
-  const path = location.pathname;
+  const page = pageForPath(location.pathname);
   const [data, setData] = useState<AuthPageData | null>(null);
   const [error, setError] = useState('');
-  const isAccount =
-    path in purposes || path === '/authorize' || path === '/settings/connected-apps';
+  const isAccount = !!page && page.kind !== 'canvas';
 
   useEffect(() => {
     if (!isAccount) return;
     const controller = new AbortController();
     void (async () => {
       try {
-        if (path === '/settings/connected-apps') {
+        if (page?.kind === 'connections') {
           setData({ kind: 'connections' });
           return;
         }
-        if (path === '/authorize') {
+        if (page?.kind === 'consent') {
           const response = await fetch('/auth/consent', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -40,8 +33,14 @@ export function App() {
             );
             return;
           }
-          const result = (await response.json()) as ConsentData & { error?: string };
-          if (!response.ok) throw new Error(result.error || 'Could not load authorization request');
+          const result = (await response.json()) as ConsentData & {
+            error?: string;
+            message?: string;
+          };
+          if (!response.ok)
+            throw new Error(
+              result.message || result.error || 'Could not load authorization request',
+            );
           if (!controller.signal.aborted) setData({ ...result, kind: 'consent' });
           return;
         }
@@ -51,7 +50,7 @@ export function App() {
         if (!controller.signal.aborted)
           setData({
             kind: 'passkey',
-            purpose: purposes[path],
+            purpose: page!.purpose!,
             initialized: result.initialized,
             origin: location.origin,
           });
@@ -61,7 +60,7 @@ export function App() {
       }
     })();
     return () => controller.abort();
-  }, [path, isAccount]);
+  }, [page, isAccount]);
 
   if (!isAccount) return <main id="app" />; // Product canvas is still an architecture shell.
   if (data) return <AuthPage data={data} />;

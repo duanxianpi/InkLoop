@@ -52,7 +52,7 @@ Creation retries reuse `request_id`. Feedback retries are deduplicated only when
 | Preferences JSON                 | 16 KiB                                            |
 | Auth/OAuth form or JSON requests | 64 KiB                                            |
 
-Product routes count actual streamed bytes, including bodies without `Content-Length`, and stop reading at the limit. The MCP SDK enforces the configured overall budget before tool execution. Schema field limits remain additional constraints: titles 200 characters, problem bodies and feedback 20,000, at most 20 callouts of 4,000 characters, and at most 50 problems per create request. A batch with maximum-length JSON-escaped problem text fits within the MCP envelope budget and is covered by tests.
+Shared HTTP readers for product and auth routes count actual streamed bytes, including bodies without `Content-Length`, and stop reading at the limit. The MCP SDK enforces the configured overall budget before tool execution. Schema field limits remain additional constraints: titles 200 characters, problem bodies and feedback 20,000, at most 20 callouts of 4,000 characters, and at most 50 problems per create request. A batch with maximum-length JSON-escaped problem text fits within the MCP envelope budget and is covered by tests.
 
 Long polling is capped at six seconds; the planned service has a two-second check interval and at most four checks. No polling or push implementation exists yet.
 
@@ -62,4 +62,4 @@ HTTP returns JSON with stable `error` codes; domain errors may include `message`
 
 Other domain codes include `unauthorized`, `forbidden`, `not_found`, `not_ready`, `revision_conflict`, `canvas_locked`, `edit_epoch_changed`, `idempotency_conflict`, `empty_canvas`, `upload_failed` and `not_implemented`. See `src/shared/errors.ts` for their status mapping.
 
-Auth endpoints retain their own error messages. The Web client treats an aborted request as cancellation, redirects an actual 401 to login, and does not treat malformed successful JSON as a valid save acknowledgment.
+Application auth failures use the same stable codes (`unauthorized`, `forbidden`, `invalid_request`, etc.) with human-readable `message` fields, mapped in `src/server/http/errors.ts`. SDK protocol endpoints retain OAuth error codes and `error_description`. The Web client treats an aborted request as cancellation, redirects an actual 401 to login, and does not treat malformed successful JSON as a valid save acknowledgment.

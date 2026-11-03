@@ -24,7 +24,7 @@ One Cloudflare Worker serves the Web and MCP interfaces. D1 stores structured st
 
 - Browser API and MCP tools call the same application service contracts.
 - Authentication resolves the owner before product handlers run.
-- One React SPA renders account and product pages; Hono serves its ordinary built JS/CSS and routes all APIs.
+- One React SPA renders account and product pages; Hono serves page shells and routes all APIs; Cloudflare serves public static assets directly with immutable caching.
 - A persistent Canvas, immutable Snapshots and append-only Feedback have separate identities and lifecycles.
 - Product commits will use D1 as the authoritative boundary; notifications never determine whether a save succeeded.
 
