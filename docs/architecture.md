@@ -99,8 +99,8 @@ Auth source is a maintained InkLoop adaptation of the upstream template. Updates
 | ------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
 | Owner, sessions, Passkeys, canonical origin, auth epoch, revocation index | D1; implemented                                                        |
 | OAuth grants/tokens and SDK metadata                                      | OAuth SDK KV; implemented                                              |
-| Collections, sets, problems, Canvas revision pointers                     | D1; pending                                                            |
-| Versioned Canvas documents and immutable Snapshot images (base64 PNG)     | Private R2; pending                                                    |
+| Collections, sets, problems, Canvas revision pointers and fingerprints    | D1; pending                                                            |
+| Versioned Canvas documents (stored verbatim) and Snapshot images (base64) | Private R2; pending                                                    |
 | Snapshot sequence/latest pointer, feedback and idempotency records        | D1; pending                                                            |
 | Server change counter                                                     | D1, advanced with visible product mutations; pending                   |
 | Unacknowledged local strokes and conflict recovery copies                 | Browser IndexedDB; pending                                             |
@@ -109,7 +109,7 @@ Auth source is a maintained InkLoop adaptation of the upstream template. Updates
 
 Snapshots carry stable IDs, per-problem monotonic sequence, source revision and creation time. Feedback explicitly references a Snapshot and must also belong to that Snapshot's Problem. Database constraints must prevent cross-problem references and duplicate sequence numbers.
 
-The transport Canvas document contains tldraw store records and schema. The storage implementation must additionally record the pinned engine version, validate supported records and compute a canonical answer fingerprint. A permissive transport object is not sufficient validation for persisted canvas content.
+The Canvas document is a tldraw store snapshot: records plus the schema versions they were written with. The browser validates it against the pinned engine schema and computes the canonical answer fingerprint before upload. The Worker stores the document verbatim and never parses it; see [Canvas trust boundary](#canvas-trust-boundary).
 
 ## 7. Draft save and submission consistency
 
@@ -118,12 +118,26 @@ The following are required implementation invariants, not claims about the curre
 ### Draft save
 
 1. Persist an unacknowledged local copy before relying on the network. Serialize saves per Problem and tag responses with the exact local version they confirm.
-2. Save with `base_revision` and `edit_epoch`. The server rejects stale revision, stale epoch, or a Ready canvas.
-3. Upload the document under a new immutable R2 key, then conditionally advance the D1 pointer and revision.
+2. Validate the document and compute its answer fingerprint in the browser. Save with `base_revision`, `edit_epoch` and the fingerprint as query parameters and the document as the body. The server rejects stale revision, stale epoch, or a Ready canvas.
+3. Stream the body under a new immutable R2 key without parsing it, then conditionally advance the D1 pointer, revision and fingerprint.
 4. Recheck auth epoch inside the database mutation. Initial request authentication alone is insufficient for in-flight requests crossing recovery.
 5. A conflict preserves the local document and offers reload/export recovery; it never silently overwrites the remote canvas.
 
 “Saved” means the server acknowledged the current content. “Stored locally” and “saved remotely” are different states.
+
+### Canvas trust boundary
+
+Only the owner's browser session writes Canvas documents; MCP has no canvas tool. The deployment has one owner, so the server trusts that session for document content and keeps every check that protects consistency.
+
+The Worker enforces, without reading the document: owner session and same-origin `Origin`; the auth epoch inside the D1 transaction; the 4 MiB size limit from `Content-Length`; the conditional `base_revision`/`edit_epoch` update; and the Ready lock. Concurrent devices therefore cannot overwrite each other, and a stale or revoked session cannot write.
+
+The browser is responsible for content: the document must load under the pinned tldraw schema, and the fingerprint must describe its answer records (camera, selection and tool state excluded, as in §6). Parsing and validating the document in the Worker would cost CPU proportional to its size on every autosave, against the 10 ms Workers Free budget.
+
+Consequences of trusting the browser, and their mitigations:
+
+- **Invalid or unwanted content** affects only the owner's own Canvas. Every revision is a separate immutable R2 object, so the client can fall back to the previous revision. tldraw validates and migrates records again when a document loads.
+- **A wrong fingerprint** affects Snapshot reuse. Reporting "changed" for unchanged content only creates a redundant Snapshot. Reporting "unchanged" for changed content would reuse an older Snapshot, so the agent reviews a stale answer. To keep this to client bugs, the browser computes the fingerprint and the export from the same frozen document.
+- **External references** are excluded at the editor: shapes and paste handlers that load external URLs (images, video, embeds, bookmarks) are disabled, so a stored document cannot make the owner's browser fetch third-party content.
 
 ### Mark ready
 
@@ -206,7 +220,7 @@ The hub must enforce auth-epoch changes and define bounded socket lifetime/reval
 
 Inputs and results are centralized in `src/shared/schemas.ts` and `model.ts`. Create destinations have enforced exclusive choices at both Set and Collection levels. The browser list client forwards filters and cursors rather than silently fetching only the first 100 records.
 
-MCP has an 8 MiB body budget; canvas JSON, PNG and preferences have 4 MiB, 8 MiB and 16 KiB budgets respectively. Shared HTTP body readers count streamed bytes before full buffering and reject invalid UTF-8. HTTP and MCP application errors share stable codes plus human-readable messages; OAuth protocol errors retain SDK codes and `error_description`. Auth/OAuth requests retain their separate 64 KiB limit. Field-level limits apply in addition to body budgets. See [API contracts](api.md). Actual Cloudflare measurements show that larger valid MCP bodies exceed 10 ms even with stub services; current limits are transport budgets, not a guarantee of Free-plan CPU capacity. See [Runtime measurements](performance.md).
+MCP has an 8 MiB body budget; canvas JSON, PNG and preferences have 4 MiB, 8 MiB and 16 KiB budgets respectively. Shared HTTP body readers count streamed bytes before full buffering and reject invalid UTF-8. Canvas documents and Snapshot images are budgeted by `Content-Length` and streamed to R2 without parsing, so their size does not drive Worker CPU. HTTP and MCP application errors share stable codes plus human-readable messages; OAuth protocol errors retain SDK codes and `error_description`. Auth/OAuth requests retain their separate 64 KiB limit. Field-level limits apply in addition to body budgets. See [API contracts](api.md). Actual Cloudflare measurements show that larger valid MCP bodies exceed 10 ms even with stub services; current limits are transport budgets, not a guarantee of Free-plan CPU capacity. See [Runtime measurements](performance.md).
 
 ## 11. Build, formatting, deployment and documentation
 

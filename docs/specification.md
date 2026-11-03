@@ -860,12 +860,13 @@ The production schema should represent the following entities.
 
 ### CanvasDocument
 
-| Field                      | Purpose                         |
-| -------------------------- | ------------------------------- |
-| `problem_id`               | Owner Problem                   |
-| `document` or `object_key` | Serialized vector drawing data  |
-| `revision`                 | Optimistic concurrency revision |
-| `updated_at`               | Last durable update             |
+| Field                      | Purpose                             |
+| -------------------------- | ----------------------------------- |
+| `problem_id`               | Owner Problem                       |
+| `document` or `object_key` | Serialized vector drawing data      |
+| `revision`                 | Optimistic concurrency revision     |
+| `fingerprint`              | Browser-computed answer fingerprint |
+| `updated_at`               | Last durable update                 |
 
 There is exactly one logical live Canvas per Problem.
 
