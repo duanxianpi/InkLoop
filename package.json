@@ -1,0 +1,36 @@
+{
+  "name": "agent-whiteboard",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node src/tooling/build.mjs",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p src/web",
+    "test": "node --test --test-concurrency=1 tests/*.test.mjs",
+    "deploy": "node src/tooling/deploy.mjs",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "dependencies": {
+    "@cloudflare/workers-oauth-provider": "1.2.4",
+    "@modelcontextprotocol/server": "2.4.0",
+    "@simplewebauthn/server": "14.0.3",
+    "hono": "4.13.16",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "tldraw": "3.15.6",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "5.20261102.1",
+    "@types/node": "26.6.6",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "6.2.1",
+    "esbuild": "0.28.2",
+    "prettier": "3.9.10",
+    "typescript": "7.0.2",
+    "vite": "8.3.5",
+    "wrangler": "4.156.1"
+  }
+}

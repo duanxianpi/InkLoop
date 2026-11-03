@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.wrangler/
+.private/
+internal/
+experiments/
+prototypes/
+templates/
+package-lock.json
+migrations/
