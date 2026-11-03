@@ -13,9 +13,9 @@ All `/api/*` product routes require the owner session. Mutations require a match
 | `GET /api/problems/:id`                                  | Problem, submission history and feedback                |
 | `GET /api/problems/:id/canvas`                           | Canvas document, revision, edit epoch and answer state  |
 | `PUT /api/problems/:id/canvas`                           | `{ base_revision, edit_epoch, document }`               |
-| `POST /api/problems/:id/submissions?revision&edit_epoch` | PNG body and `Idempotency-Key`; new or reused Snapshot  |
+| `POST /api/problems/:id/submissions?revision&edit_epoch` | Base64 PNG text and `Idempotency-Key`; new or reused    |
 | `POST /api/problems/:id/resume`                          | Resume the same canvas; return the current edit epoch   |
-| `GET /api/snapshots/:id/image`                           | Authenticated immutable PNG content                     |
+| `GET /api/snapshots/:id/image`                           | Authenticated immutable base64 PNG text                 |
 | `GET /api/preferences`                                   | Preferences object                                      |
 | `PUT /api/preferences`                                   | Merge keys; `null` removes a key                        |
 | `GET /api/changes?since&timeout`                         | Current counter without `since`; bounded wait otherwise |
@@ -23,7 +23,7 @@ All `/api/*` product routes require the owner session. Mutations require a match
 
 List filters are `collection_id`, `set_id`, `answer_state`, `cursor` and `limit` (1–100). Pass the returned cursor back with the same filters. `src/web/api.ts` accepts these parameters directly. Cursors are opaque to the browser; the current schema caps them at 20 characters, so the future repository implementation must fit that contract or revise both together.
 
-JSON writes require `Content-Type: application/json`. Submission bodies require `image/png`; an empty body represents a possible reuse request, which the service must validate against the current content. MIME checking at the route is not PNG validation: the future submission service must validate image bytes and dimensions.
+JSON writes require `Content-Type: application/json`. A submission body is the base64 text of the PNG (`text/plain`); an empty body represents a possible reuse request, which the service must validate against the current content. The Worker validates the PNG header and dimensions from the first 32 characters and streams the rest to R2 without decoding it; see [Snapshot image representation](architecture.md#snapshot-image-representation). The current route adapter still accepts an `image/png` body and reads it into memory; it changes to this contract together with the submission service.
 
 ## MCP tools
 
@@ -46,13 +46,13 @@ Creation retries reuse `request_id`. Feedback retries are deduplicated only when
 
 `src/shared/limits.ts` is authoritative. Limits are not independently hardcoded by each adapter.
 
-| Request                          | Complete body limit                               |
-| -------------------------------- | ------------------------------------------------- |
-| MCP JSON-RPC                     | 8 MiB, including envelope and JSON escaping       |
-| Canvas JSON save                 | 4 MiB, including revision/epoch/document envelope |
-| Snapshot PNG                     | 8 MiB                                             |
-| Preferences JSON                 | 16 KiB                                            |
-| Auth/OAuth form or JSON requests | 64 KiB                                            |
+| Request                          | Complete body limit                                     |
+| -------------------------------- | ------------------------------------------------------- |
+| MCP JSON-RPC                     | 8 MiB, including envelope and JSON escaping             |
+| Canvas JSON save                 | 4 MiB, including revision/epoch/document envelope       |
+| Snapshot image                   | 8 MiB decoded PNG; at most 11,184,812 base64 characters |
+| Preferences JSON                 | 16 KiB                                                  |
+| Auth/OAuth form or JSON requests | 64 KiB                                                  |
 
 Shared HTTP readers for product and auth routes count actual streamed bytes, including bodies without `Content-Length`, and stop reading at the limit. The MCP endpoint applies the same streamed limit to its whole request before parsing. Schema field limits remain additional constraints: titles 200 characters, problem bodies and feedback 20,000, at most 20 callouts of 4,000 characters, and at most 50 problems per create request. A batch with maximum-length JSON-escaped problem text fits within the MCP envelope budget and is covered by tests.
 

@@ -100,7 +100,7 @@ Auth source is a maintained Whiteboard adaptation of the upstream template. Upda
 | Owner, sessions, Passkeys, canonical origin, auth epoch, revocation index | D1; implemented                                                        |
 | OAuth grants/tokens and SDK metadata                                      | OAuth SDK KV; implemented                                              |
 | Collections, sets, problems, Canvas revision pointers                     | D1; pending                                                            |
-| Versioned Canvas documents and immutable Snapshot images                  | Private R2; pending                                                    |
+| Versioned Canvas documents and immutable Snapshot images (base64 PNG)     | Private R2; pending                                                    |
 | Snapshot sequence/latest pointer, feedback and idempotency records        | D1; pending                                                            |
 | Server change counter                                                     | D1, advanced with visible product mutations; pending                   |
 | Unacknowledged local strokes and conflict recovery copies                 | Browser IndexedDB; pending                                             |
@@ -136,8 +136,8 @@ sequenceDiagram
     participant H as ChangeHub
     UI->>UI: Freeze one document for save and export
     UI->>S: Save document; obtain revision
-    UI->>S: Commit PNG + revision + edit epoch + idempotency key
-    S->>R: Store immutable image object
+    UI->>S: Commit base64 PNG + revision + edit epoch + idempotency key
+    S->>R: Stream immutable base64 image object
     S->>D: Guard and atomically commit Snapshot, sequence, latest pointer, Ready, idempotency and counter
     D-->>S: Committed result
     S-->>UI: Ready confirmation
@@ -172,6 +172,23 @@ Object collection must exclude referenced and in-flight objects and use a retent
 A resumed canvas can coexist with a retrievable older Snapshot. Responses state `answer_state` and whether the server-known draft differs from the latest committed answer. Offline local strokes are outside that claim.
 
 Feedback is append-only and tied to the supplied Snapshot. Multiple entries for one Snapshot are valid. The latest graded entry determines that Snapshot's effective verdict; an ungraded comment does not clear it. Trend compares distinct graded Snapshots. Historical feedback must not overwrite the displayed state of a newer, unreviewed answer.
+
+### Snapshot image representation
+
+Each Snapshot image is stored once, in private R2, as the base64 text of its PNG. D1 holds the object key, text length, PNG dimensions and Snapshot metadata, never the image itself. The image bytes never pass through Worker JavaScript on either the write or the read path.
+
+Why base64 in R2:
+
+- MCP carries images as base64 inside JSON. Stored already encoded, the object can be streamed straight into the `get_submission` response. Encoding in the Worker would cost CPU proportional to image size, against the 10 ms Workers Free budget ([Runtime measurements](performance.md)).
+- D1 is unsuitable. A row, string or BLOB is limited to 2 MB, below the 8 MiB Snapshot limit, and a BLOB crosses the D1 binding as a JavaScript array with one number per byte, serialized through JSON. Per-call binding overhead is already the largest warm CPU cost; image-sized results would dominate it.
+- One stored representation avoids keeping a PNG and a base64 copy consistent. The cost is 4/3 storage and upload size.
+
+Write path: the browser encodes the exported PNG (browser CPU costs nothing against the Worker budget) and uploads the text with a `Content-Length`. The Worker checks the length against the limit, decodes only the first 32 characters (24 bytes: PNG signature and IHDR width/height) to validate the header and dimensions, and pipes the remaining stream into R2 through a fixed-length stream. It does not decode, hash or rescan the body. The commit then follows §7 unchanged. Full decoding would cost CPU proportional to size; a body that is malformed after a valid header can only be the single owner's own submission.
+
+Read paths:
+
+- `get_submission` serializes its JSON-RPC result with a placeholder for the image `data`, splits the string at the placeholder, and responds with prefix + R2 object stream + suffix and an exact `Content-Length`. Base64 contains no characters that need JSON escaping.
+- `GET /api/snapshots/:id/image` returns the stored text unchanged; the browser decodes it for display.
 
 Use one shared pure derivation module when implementing these states, so Overview, Review and MCP summaries agree.
 
