@@ -84,6 +84,8 @@ const DEFAULT_PREFS: Prefs = {
 const LOCKED_HINT = 'Ready for Review. Resume editing to make changes.';
 const CAPTURE_DELAY_MS = 800;
 const NARROW = 600;
+/** The question tile's layout scale (--z on .paper); the camera scales it by zoom / TILE_SCALE. */
+const TILE_SCALE = 2;
 
 // Per-browser conveniences (Architecture §6): never authoritative, so failures are ignored.
 const local = {
@@ -150,7 +152,6 @@ export class BoardController {
   /** The current camera is the untouched default, so it follows the tile's measured height. */
   private defaultCamera = false;
   private tileHeight = 220;
-  private paperZoom = 1;
   private world: { world: HTMLElement; paper: HTMLElement; under: HTMLElement } | null = null;
   private tile: HTMLElement | null = null;
   private qrow: HTMLElement | null = null;
@@ -303,6 +304,8 @@ export class BoardController {
 
   registerWorld(world: HTMLElement | null, paper: HTMLElement | null, under: HTMLElement | null) {
     this.world = world && paper && under ? { world, paper, under } : null;
+    paper?.style.setProperty('--z', String(TILE_SCALE));
+    if (paper) paper.style.transform = `scale(${1 / TILE_SCALE})`; // Zoom 1 until the camera reports.
     if (this.engine) this.onCamera(this.engine.getCamera());
   }
   registerQuestionRow(element: HTMLElement | null) {
@@ -312,9 +315,9 @@ export class BoardController {
   registerTile(element: HTMLElement | null) {
     this.tile = element;
   }
-  /** `height` is as laid out at the current zoom; the tile is stored at zoom 1. */
+  /** `height` is as laid out, at TILE_SCALE; the tile is stored at zoom 1. */
   tileResized(height: number) {
-    height /= this.paperZoom;
+    height /= TILE_SCALE;
     if (!height || Math.abs(height - this.tileHeight) < 2) return;
     this.tileHeight = height;
     if (this.defaultCamera && this.engine && this.state.canvas === 'ready')
@@ -329,10 +332,8 @@ export class BoardController {
         // Whole device pixels: a fractional offset resamples the printed question and blurs it.
         const snap = (value: number) => Math.round(value * devicePixelRatio) / devicePixelRatio;
         world.style.transform = `translate(${snap(camera.x)}px, ${snap(camera.y)}px)`;
-        // Laid out at the zoom (see .qtile), never scaled or CSS-zoomed: a scale transform smears
-        // the question's math, and WebKit's zoom shrinks the tile without shrinking its text.
-        this.paperZoom = camera.z;
-        paper.style.setProperty('--z', String(camera.z));
+        // Laid out once at TILE_SCALE and only scaled here, so zooming never reflows it (see .qtile).
+        paper.style.transform = `scale(${camera.z / TILE_SCALE})`;
         const grid = 28 * camera.z;
         under.style.backgroundSize = `${grid}px ${grid}px`;
         under.style.backgroundPosition = `${camera.x}px ${camera.y}px`;

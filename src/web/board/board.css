@@ -60,7 +60,7 @@
   height: 0;
 }
 .paper {
-  --z: 1;
+  transform-origin: 0 0;
 }
 #engine {
   position: absolute;
@@ -101,8 +101,10 @@
 }
 
 /* question: printed tile on the board; peek + popped card in the tile's home position when it scrolls away.
-   The tile follows the camera by laying itself out at the camera's zoom --z (set on .paper): every
-   length, font sizes included, is its size at zoom 1 times --z, so text is typeset at its real size. */
+   The tile is laid out once at --z times its size (set on .paper) and the camera only scales it, by
+   zoom / --z: its line breaks and height never change while zooming, and WebKit, which rasterises
+   the math SVG at layout size, gets --z times the pixels. Laying it out at each zoom instead made
+   it rewrap and jump, and CSS zoom shrank its box but not its text. */
 .qtile {
   position: absolute;
   left: 0;
