@@ -1,8 +1,12 @@
-import { useEffect, useRef } from 'react';
+import { useLayoutEffect, useRef } from 'react';
 import type { ProblemSummary } from '../../shared/model';
 import type { BoardController, BoardState } from './controller';
 import { Chevron } from './icons';
+import { usePresence } from './presence';
 import { batchOf, inSet, numberOf, TILE_CLASS, TILE_LABEL, trendBadge } from './view';
+
+/** .ovscroll's top padding: a batch scrolled to the top keeps it above its heading. */
+const SCROLL_PAD = 12;
 
 const LEGEND = [
   ['empty', 'Not started'],
@@ -27,8 +31,14 @@ export function Overview({
     s.collections.find((entry) => entry.id === s.ui.coll) ??
     s.collections.find((entry) => entry.id === current.collection_id) ??
     s.collections[0];
+  const scroller = useRef<HTMLDivElement>(null);
   const focused = useRef<HTMLDivElement>(null);
-  useEffect(() => focused.current?.scrollIntoView({ block: 'nearest' }), [s.ui.batch]);
+  // Opened from the title bar's batch: that batch starts at the top, before the sheet is painted.
+  useLayoutEffect(() => {
+    if (scroller.current && focused.current)
+      scroller.current.scrollTop = focused.current.offsetTop - SCROLL_PAD;
+  }, [s.ui.batch]);
+  const menu = usePresence(s.ui.collMenu);
   if (!collection) return null;
   const setIds = collection.sets.map((set) => set.id);
   const setId = setIds.includes(s.ui.set ?? '')
@@ -74,8 +84,8 @@ export function Overview({
         <button className="ib" aria-label="Close" onClick={() => c.closeAll()}>
           <Chevron dir="x" />
         </button>
-        {s.ui.collMenu && (
-          <div className="collmenu" role="menu">
+        {menu.mounted && (
+          <div className="collmenu" role="menu" data-state={menu.state}>
             {s.collections.map((entry) => (
               <button
                 key={entry.id}
@@ -107,15 +117,11 @@ export function Overview({
           ))}
         </div>
       )}
-      <div className="ovscroll">
+      <div className="ovscroll" ref={scroller}>
         {batches.map((batch) => {
           const isFocused = setId === current.set_id && batch === s.ui.batch;
           return (
-            <div
-              key={batch}
-              className={`sec${isFocused ? ' focus' : ''}`}
-              ref={isFocused ? focused : undefined}
-            >
+            <div key={batch} className="sec" ref={isFocused ? focused : undefined}>
               <h4>{batch}</h4>
               <div className="tiles">
                 {problems.filter((problem) => batchOf(problem) === batch).map(tile)}

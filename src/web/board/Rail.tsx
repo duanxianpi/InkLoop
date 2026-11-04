@@ -3,15 +3,18 @@ import { CopyButton, mcpUrl } from '../design/Copy';
 import { forgetOfflineData } from '../pwa';
 import type { BoardController, BoardState } from './controller';
 import { EraserIcon, PenIcon, RedoIcon, SettingsIcon, UndoIcon } from './icons';
+import { usePresence } from './presence';
 
 type Props = { s: BoardState; c: BoardController; locked: boolean };
 
 /** Writing tools on the edge away from the writing hand; horizontal at the bottom on narrow screens. */
 export function Rail({ s, c, locked }: Props) {
   const side = s.narrow ? 'h' : s.prefs.hand === 'right' ? 'left' : 'right';
+  const settings = usePresence(s.ui.settings);
+  const colors = usePresence(s.ui.colors);
   return (
     <div
-      className={`rail ${side} float${s.ui.settings || s.ui.colors ? ' withpop' : ''}`}
+      className={`rail ${side} float${settings.mounted || colors.mounted ? ' withpop' : ''}`}
       role="toolbar"
       aria-label="Writing tools"
     >
@@ -68,9 +71,9 @@ export function Rail({ s, c, locked }: Props) {
       >
         <SettingsIcon />
       </button>
-      {s.ui.settings && <Settings s={s} c={c} />}
-      {s.ui.colors && (
-        <div className="cpop" role="menu" aria-label="Pen colour">
+      {settings.mounted && <Settings s={s} c={c} state={settings.state} />}
+      {colors.mounted && (
+        <div className="cpop" role="menu" aria-label="Pen colour" data-state={colors.state}>
           {(Object.keys(INK) as InkColor[]).map((color) => (
             <button
               key={color}
@@ -96,14 +99,14 @@ function Toggle({ on, label, onClick }: { on: boolean; label: string; onClick():
   );
 }
 
-function Settings({ s, c }: { s: BoardState; c: BoardController }) {
+function Settings({ s, c, state }: { s: BoardState; c: BoardController; state: string }) {
   const signOut = async () => {
     await fetch('/logout', { method: 'POST', credentials: 'same-origin' }).catch(() => undefined);
     await forgetOfflineData().catch(() => undefined);
     location.assign('/login');
   };
   return (
-    <div className="pop" id="settings" role="dialog" aria-label="Settings">
+    <div className="pop" id="settings" role="dialog" aria-label="Settings" data-state={state}>
       <div className="grp">
         <h3>Writing</h3>
         <Toggle

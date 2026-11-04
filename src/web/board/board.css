@@ -970,6 +970,7 @@
   color: var(--on-accent);
 }
 .ovscroll {
+  position: relative;
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
@@ -983,12 +984,6 @@
   display: flex;
   flex-direction: column;
   gap: 7.5px;
-}
-.sec.focus {
-  margin: -6px -9px;
-  padding: 6px 9px;
-  border-radius: var(--r-m);
-  background: var(--soft);
 }
 .sec h4 {
   margin: 0;
@@ -1339,18 +1334,78 @@
 }
 
 @keyframes fade {
-  0%,
+  0% {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.96);
+  }
+  8%,
   70% {
     opacity: 1;
+    transform: none;
   }
   100% {
     opacity: 0;
+  }
+}
+
+/* popups grow out of the control they hang from and shrink back into it (presence.ts keeps them
+   mounted for the pop-out) */
+.sheet,
+.collmenu,
+.fb,
+.pop,
+.cpop {
+  --pop-from: translateY(-6px);
+  transform-origin: top left;
+  animation: pop-in 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.fb {
+  transform-origin: top right;
+}
+.pop,
+.cpop {
+  --pop-from: translateX(-6px);
+  transform-origin: left center;
+}
+.pop {
+  transform-origin: left bottom;
+}
+.rail.right .pop,
+.rail.right .cpop {
+  --pop-from: translateX(6px);
+  transform-origin: right center;
+}
+.rail.right .pop {
+  transform-origin: right bottom;
+}
+.rail.h .pop,
+.rail.h .cpop {
+  --pop-from: translateY(6px);
+  transform-origin: bottom left;
+}
+.app [data-state='closed'] {
+  animation: pop-out 0.14s ease-in forwards;
+  pointer-events: none;
+}
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: var(--pop-from) scale(0.96);
+  }
+}
+@keyframes pop-out {
+  to {
+    opacity: 0;
+    transform: var(--pop-from) scale(0.96);
   }
 }
 @media (prefers-reduced-motion: reduce) {
   * {
     animation: none !important;
     transition: none !important;
+  }
+  .app [data-state='closed'] {
+    visibility: hidden;
   }
 }
 

@@ -9,6 +9,7 @@ import { Engine } from '../canvas/engine';
 import { BoardController, type BoardState } from './controller';
 import { loadMath } from './math';
 import { Overview } from './Overview';
+import { usePresence } from './presence';
 import { QuestionBar } from './QuestionBar';
 import { Rail } from './Rail';
 import { FeedbackCard, TopRight } from './Review';
@@ -167,6 +168,7 @@ function Chrome({
   detail?: ProblemDetail;
 }) {
   const locked = detail?.answer_state === 'ready_for_review' || s.marking || s.canvas !== 'ready';
+  const sheet = usePresence(s.ui.overview);
   return (
     <>
       <Rail s={s} c={c} locked={locked} />
@@ -185,13 +187,11 @@ function Chrome({
           </button>
         </div>
       )}
-      {s.ui.overview && (
-        <>
-          <div className="scrim clear" onClick={() => c.closeAll()} />
-          <div className="sheet" role="dialog" aria-label="All problems">
-            <Overview s={s} c={c} current={current} />
-          </div>
-        </>
+      {s.ui.overview && <div className="scrim clear" onClick={() => c.closeAll()} />}
+      {sheet.mounted && (
+        <div className="sheet" role="dialog" aria-label="All problems" data-state={sheet.state}>
+          <Overview s={s} c={c} current={current} />
+        </div>
       )}
       {(s.ui.settings || s.ui.colors) && (
         <div className="scrim clear" onClick={() => c.closeAll()} />

@@ -966,7 +966,7 @@ export class BoardController {
       fb: false,
     });
   }
-  /** The title bar's levels: each opens the Overview at the current problem's level. */
+  /** The title bar's levels: each opens the Overview, scrolled to the current problem's batch for the batch level. */
   browse(level: 'collection' | 'set' | 'batch') {
     this.ui({
       overview: true,
@@ -974,7 +974,7 @@ export class BoardController {
       coll: null,
       set: null,
       batch: level === 'batch' ? (this.currentSummary()?.type ?? null) : null,
-      collMenu: level === 'collection',
+      collMenu: false,
       settings: false,
       colors: false,
       fb: false,

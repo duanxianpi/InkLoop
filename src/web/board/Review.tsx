@@ -1,6 +1,7 @@
 import type { CalloutKind, ProblemDetail } from '../../shared/model';
 import type { BoardController, BoardState } from './controller';
 import { Chevron, FeedbackIcon, PenIcon, ReadyIcon } from './icons';
+import { usePresence } from './presence';
 import { RichText, Tex } from './RichText';
 import { hhmm, shownFeedback, snapshotOf, VERDICT, verdictClass } from './view';
 
@@ -50,7 +51,8 @@ const CALLOUT_CLASS: Record<CalloutKind, string> = { correct: 'ok', fix: 'fix', 
 /** The expanded review card under the top-right controls (§7.2–7.4). */
 export function FeedbackCard({ s, c, detail }: Props) {
   const shown = detail && shownFeedback(detail, s.ui.fbSel);
-  if (!detail || !shown || !s.ui.fb) return null;
+  const card = usePresence(s.ui.fb && !!shown);
+  if (!detail || !shown || !card.mounted) return null;
   const verdict = shown.verdict ? VERDICT[shown.verdict] : null;
   const snapshot = snapshotOf(detail, shown.snapshot_id)!;
   const latest = detail.snapshots.at(-1)!;
@@ -74,6 +76,7 @@ export function FeedbackCard({ s, c, detail }: Props) {
       role="region"
       aria-label="Feedback"
       style={style}
+      data-state={card.state}
     >
       <div className="fbhead">
         {verdict ? (
