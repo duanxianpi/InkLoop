@@ -100,6 +100,23 @@ export const drafts = {
 };
 
 export const savedCanvases = {
+  /** Resume changes the edit epoch, not the document. Only advance a matching revision: a
+   * different revision belongs to other content and must never be relabelled as this one. */
+  async advanceEpoch(problemId: string, revision: number, editEpoch: number) {
+    const advance = (saved: SavedCanvas | undefined) =>
+      saved && saved.revision === revision && saved.edit_epoch < editEpoch
+        ? { ...saved, edit_epoch: editEpoch }
+        : undefined;
+    const updated = advance(memory[SAVED].get(problemId));
+    if (updated) memory[SAVED].set(problemId, updated);
+    await run(SAVED, 'readwrite', (store) => {
+      const request = store.get(problemId);
+      request.onsuccess = () => {
+        const updated = advance(request.result as SavedCanvas | undefined);
+        if (updated) store.put(updated);
+      };
+    }).catch(() => undefined);
+  },
   async get(problemId: string): Promise<SavedCanvas | null> {
     const stored = await run<SavedCanvas>(SAVED, 'readonly', (store) => store.get(problemId)).catch(
       () => undefined,

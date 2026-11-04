@@ -49,6 +49,7 @@ await build({
   define: {
     BUILD_FILES: JSON.stringify(files.sort()),
     PRECACHE: JSON.stringify(files.filter(opensBoard)),
+    BUILD_SHELL: JSON.stringify(await readFile(path('dist/public/index.html'), 'utf8')),
   },
   outfile: path('dist/public/sw.js'),
 });

@@ -278,6 +278,134 @@ test('offline, the board shows only content it can save on top of: never stale o
   }
 });
 
+test('first service worker control warms paginated reads without disturbing local ink', async () => {
+  const originalNavigator = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
+  const serviceWorker = { controller: null };
+  Object.defineProperty(globalThis, 'navigator', { configurable: true, value: { serviceWorker } });
+  globalThis.innerWidth ??= 1024;
+  const { BoardController } = await loadSource('src/web/board/controller.ts');
+  const board = new BoardController();
+  const detail = { id: 'warm-current', body: 'Original question' };
+  board.set({
+    phase: 'ready',
+    currentId: detail.id,
+    details: { [detail.id]: detail },
+    hasInk: true,
+  });
+  board.dirty = true;
+  board.engine = {
+    load() {
+      assert.fail('warming must not reload the canvas');
+    },
+  };
+  let offline = true;
+  const stub = stubFetch(async ({ url }) => {
+    if (offline) throw new TypeError('offline');
+    if (url.pathname === '/api/problems')
+      return Response.json({
+        problems: [],
+        next_cursor: url.searchParams.has('cursor') ? null : '100',
+      });
+    return Response.json({ body: 'New server text, only for the cache' });
+  });
+  try {
+    await board.cacheOfflineReads();
+    assert.equal(stub.requests.length, 0, 'wait for control before warming');
+    serviceWorker.controller = {};
+    await board.cacheOfflineReads();
+    assert.equal(board.needsOfflineReads, true, 'failure can be retried after reconnect');
+    offline = false;
+    await board.cacheOfflineReads();
+    const paths = stub.requests.map(({ url }) => url.pathname + url.search);
+    for (const path of [
+      '/api/preferences',
+      '/api/collections',
+      '/api/problems?limit=100',
+      '/api/problems?cursor=100&limit=100',
+      '/api/problems/warm-current',
+    ])
+      assert.ok(paths.includes(path), path);
+    assert.equal(board.state.currentId, detail.id);
+    assert.equal(board.state.details[detail.id], detail);
+    assert.equal(board.dirty, true);
+    assert.equal(board.state.hasInk, true);
+    const count = stub.requests.length;
+    await board.cacheOfflineReads();
+    assert.equal(stub.requests.length, count, 'successful warm-up runs once');
+  } finally {
+    stub.restore();
+    if (originalNavigator) Object.defineProperty(globalThis, 'navigator', originalNavigator);
+    else delete globalThis.navigator;
+  }
+});
+
+test('Resume persists its epoch so an offline reopen uploads without a false conflict', async () => {
+  globalThis.innerWidth ??= 1024;
+  globalThis.getComputedStyle ??= () => ({ getPropertyValue: () => '' });
+  globalThis.document ??= { documentElement: {} };
+  const device = await loadSource('src/web/board/controller.ts', 'src/web/sync/drafts.ts');
+  const id = 'resume-offline';
+  const copy = {
+    problem_id: id,
+    document: content(1).document,
+    fingerprint: content(1).fingerprint,
+    revision: 5,
+    edit_epoch: 0,
+  };
+  await device.savedCanvases.put(copy);
+  const engine = () => ({
+    load() {},
+    count: () => 1,
+    getCamera: () => null,
+    setCamera() {},
+    capture: () => content(1),
+    setTool() {},
+    setLocked() {},
+    setColor() {},
+  });
+  const board = new device.BoardController();
+  board.engine = engine();
+  board.set({ currentId: id, problems: [{ id }] });
+  board.createSync(id, { revision: 5, edit_epoch: 0, fingerprint: copy.fingerprint });
+  let reconnect = false;
+  const stub = stubFetch(async ({ url }) => {
+    if (url.pathname.endsWith('/resume'))
+      return Response.json({ revision: 5, edit_epoch: 1, answer_state: 'working' });
+    if (url.pathname.endsWith('/canvas')) {
+      if (!reconnect) throw new TypeError('offline');
+      assert.equal(url.searchParams.get('base_revision'), '5');
+      assert.equal(url.searchParams.get('edit_epoch'), '1');
+      return saved(6);
+    }
+    // The service worker can still serve the last problem metadata offline.
+    return Response.json({ id, answer_state: 'working', has_content: true, edit_epoch: 1 });
+  });
+  let reopened;
+  try {
+    await board.resume();
+    assert.deepEqual(await device.savedCanvases.get(id), { ...copy, edit_epoch: 1 });
+    // Stale responses and different revisions must not relabel the stored document.
+    await device.savedCanvases.advanceEpoch(id, 5, 0);
+    await device.savedCanvases.advanceEpoch(id, 6, 2);
+    assert.deepEqual(await device.savedCanvases.get(id), { ...copy, edit_epoch: 1 });
+    reopened = new device.BoardController();
+    reopened.engine = engine();
+    reopened.set({ currentId: id, problems: [{ id }] });
+    await reopened.open(id);
+    const sync = reopened.syncs.get(id);
+    assert.equal(sync.current.edit_epoch, 1);
+    sync.change(content(2));
+    reconnect = true;
+    await sync.flush();
+    assert.equal(sync.status.kind, 'saved');
+    assert.equal((await device.savedCanvases.get(id)).revision, 6);
+  } finally {
+    stub.restore();
+    board.syncs.get(id)?.dispose();
+    reopened?.syncs.get(id)?.dispose();
+  }
+});
+
 test('untrusted Markdown renders math and text, never markup', () => {
   assert.deepEqual(tokenize('Cost \\$5, $x^2$ and $$\\int f$$ \\(a\\) \\[b\\]'), [
     { math: false, text: 'Cost $5, ' },

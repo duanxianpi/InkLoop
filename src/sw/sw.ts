@@ -16,6 +16,8 @@ declare const self: ServiceWorkerGlobalScope;
 declare const BUILD_FILES: string[];
 /** Set by the build: the files the board loads to open, cached before this version installs. */
 declare const PRECACHE: string[];
+/** The HTML belonging to PRECACHE, so a deployment race cannot publish a different build. */
+declare const BUILD_SHELL: string;
 
 const SHELL_URL = '/';
 
@@ -38,6 +40,7 @@ self.addEventListener('install', (event) => {
       // Last, so a cached shell never refers to files that are not cached yet.
       const shell = await fetch(SHELL_URL, { cache: 'no-store' });
       if (!shell.ok) throw new Error('shell_unavailable');
+      if ((await shell.clone().text()) !== BUILD_SHELL) throw new Error('shell_build_changed');
       await (await caches.open(CACHES.shell)).put(SHELL_URL, unredirected(shell));
     })(),
   );
@@ -76,8 +79,8 @@ async function board(event: FetchEvent) {
   } catch (error) {
     return (await cached(CACHES.shell, SHELL_URL)) ?? Promise.reject(error);
   }
-  // A sign-in redirect is an opaque, non-ok response; only the page itself is kept.
-  if (response.ok) keep(event, CACHES.shell, SHELL_URL, unredirected(response.clone()));
+  // Only install may publish an offline shell, after caching its complete build. A navigation
+  // can already see the next deployment while its worker and files are still downloading.
   return response;
 }
 

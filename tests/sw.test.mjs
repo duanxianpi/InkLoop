@@ -51,6 +51,7 @@ globalThis.self = {
 };
 globalThis.BUILD_FILES = ['/assets/index-new.js', '/assets/tldraw/1/icons/icon/0_merged.svg'];
 globalThis.PRECACHE = ['/assets/index-new.js'];
+globalThis.BUILD_SHELL = '<html>';
 const realFetch = globalThis.fetch;
 globalThis.fetch = (request, init) =>
   network(new URL(typeof request === 'string' ? request : request.url, origin), init);
@@ -111,6 +112,36 @@ test('activation keeps data and current files and drops what no open page can ne
   assert.deepEqual((await caches.keys()).sort(), [CACHES.assets, CACHES.data].sort());
 });
 
+test('a navigation and a failed update preserve the last complete offline shell', async () => {
+  reset();
+  const oldShell = '<html>old complete build</html>';
+  await (await caches.open(CACHES.shell)).put('/', new Response(oldShell));
+  network = async (url) =>
+    url.pathname.startsWith('/assets/')
+      ? new Response('temporarily unavailable', { status: 503 })
+      : new Response('<html>new build</html>');
+  assert.equal(await (await dispatch('/', { mode: 'navigate' })).text(), '<html>new build</html>');
+  await assert.rejects(lifecycle('install'), /precache failed/);
+  network = async () => {
+    throw new TypeError('offline');
+  };
+  assert.equal(await (await dispatch('/app', { mode: 'navigate' })).text(), oldShell);
+});
+
+test('a deployment changing during installation cannot mix a shell with another build', async () => {
+  reset();
+  await (await caches.open(CACHES.shell)).put('/', new Response('old complete build'));
+  network = async (url) => new Response(url.pathname === '/' ? 'a newer deployment' : 'file');
+  await assert.rejects(lifecycle('install'), /shell_build_changed/);
+  assert.equal(
+    await (await caches.match('/', { cacheName: CACHES.shell })).text(),
+    'old complete build',
+  );
+  network = async (url) => new Response(url.pathname === '/' ? BUILD_SHELL : 'file');
+  await lifecycle('install');
+  assert.equal(await (await caches.match('/', { cacheName: CACHES.shell })).text(), BUILD_SHELL);
+});
+
 test('a failing cache write never replaces what the network answered', async () => {
   reset();
   await (await caches.open(CACHES.data)).put('/api/problems/p1', Response.json({ revision: 1 }));
@@ -130,6 +161,7 @@ test('offline: last reads and the shell come from this device; canvases and writ
     url.pathname === '/'
       ? new Response('<html>', { headers: { 'Content-Type': 'text/html' } })
       : Response.json({ online: url.pathname });
+  await lifecycle('install');
   await dispatch('/', { mode: 'navigate' });
   await dispatch('/api/collections');
   network = async () => {

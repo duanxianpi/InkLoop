@@ -155,6 +155,11 @@ export class BoardController {
   private qrow: HTMLElement | null = null;
   private frame = 0;
   private stopped = false;
+  private needsOfflineReads =
+    typeof navigator !== 'undefined' &&
+    'serviceWorker' in navigator &&
+    !navigator.serviceWorker.controller;
+  private cachingOfflineReads = false;
 
   get state() {
     return this.store.get();
@@ -174,6 +179,8 @@ export class BoardController {
     addEventListener('online', this.onOnline);
     addEventListener('pagehide', this.onHide);
     document.addEventListener('visibilitychange', this.onHide);
+    if ('serviceWorker' in navigator)
+      navigator.serviceWorker.addEventListener('controllerchange', this.cacheOfflineReads);
     try {
       const [preferences, { collections }, problems] = await Promise.all([
         api.preferences().catch(() => ({}) as Preferences),
@@ -198,6 +205,7 @@ export class BoardController {
       this.feed.start();
       if (this.engine) this.applyPrefs(this.engine);
       if (currentId) await this.open(currentId);
+      void this.cacheOfflineReads();
     } catch (error) {
       if (!(error instanceof ApiError && error.status === 401)) this.set({ phase: 'error' });
     }
@@ -208,6 +216,8 @@ export class BoardController {
     this.captureNow();
     this.saveCamera();
     this.feed.stop();
+    if ('serviceWorker' in navigator)
+      navigator.serviceWorker.removeEventListener('controllerchange', this.cacheOfflineReads);
     this.syncs.forEach((sync) => sync.dispose());
     this.detachGestures?.();
     removeEventListener('resize', this.onResize);
@@ -604,7 +614,39 @@ export class BoardController {
     return content;
   }
 
-  private onOnline = () => this.syncs.forEach((sync) => sync.retrySoon());
+  /** Reads made before first control did not reach the worker. Warm its data cache without
+   * applying the responses to the board, moving the camera, or replacing any local ink. */
+  private cacheOfflineReads = async () => {
+    if (
+      this.stopped ||
+      !this.needsOfflineReads ||
+      this.cachingOfflineReads ||
+      this.state.phase !== 'ready' ||
+      !navigator.serviceWorker.controller
+    )
+      return;
+    this.cachingOfflineReads = true;
+    try {
+      const ids = new Set(Object.keys(this.state.details));
+      if (this.state.currentId) ids.add(this.state.currentId);
+      await Promise.all([
+        api.preferences(),
+        api.collections(),
+        api.allProblems(),
+        ...[...ids].map((id) => api.problem(id)),
+      ]);
+      this.needsOfflineReads = false;
+    } catch {
+      // A later online event retries; the open board and its save queues are unaffected.
+    } finally {
+      this.cachingOfflineReads = false;
+    }
+  };
+
+  private onOnline = () => {
+    this.syncs.forEach((sync) => sync.retrySoon());
+    void this.cacheOfflineReads();
+  };
   private onHide = () => {
     if (document.visibilityState === 'hidden' || !document.visibilityState) {
       this.captureNow();
@@ -707,6 +749,7 @@ export class BoardController {
         edit_epoch: result.edit_epoch,
         fingerprint: sync.current.fingerprint,
       });
+      await savedCanvases.advanceEpoch(id, result.revision, result.edit_epoch);
       if (this.state.currentId === id) {
         engine.setLocked(result.answer_state === 'ready_for_review');
         engine.setTool('draw');
