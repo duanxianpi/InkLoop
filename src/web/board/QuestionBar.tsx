@@ -2,7 +2,7 @@ import type { ProblemDetail, ProblemSummary } from '../../shared/model';
 import type { BoardController, BoardState } from './controller';
 import { Chevron, GridIcon } from './icons';
 import { RichText } from './RichText';
-import { inSet, numberOf, shortSet } from './view';
+import { inSet, numberOf } from './view';
 
 type Props = {
   s: BoardState;
@@ -11,7 +11,10 @@ type Props = {
   detail: ProblemDetail | undefined;
 };
 
-/** Sticky Peek (§5.2): overview · set / question · previous and next; the title unfolds the question. */
+/**
+ * Sticky Peek (§5.2): overview · collection / set / batch · question · previous and next. Each
+ * level opens the overview at that level; the question unfolds its statement.
+ */
 export function QuestionBar({ s, c, problem, detail }: Props) {
   const list = inSet(s.problems, problem.set_id);
   const index = list.indexOf(problem);
@@ -29,18 +32,46 @@ export function QuestionBar({ s, c, problem, detail }: Props) {
           <GridIcon />
         </button>
         <span className="vsep" />
-        <button
-          className="qttl"
-          aria-expanded={open}
-          aria-label={`${open ? 'Hide' : 'Show'} question ${number}: ${problem.title}`}
-          onClick={() => c.toggleQuestion()}
-        >
-          <span className="wk">{s.narrow ? shortSet(problem.set_title) : problem.set_title}</span>
-          <span className="sl">/</span>
-          <span className="qt">
+        <nav className="qttl" aria-label="Where this problem is">
+          <button
+            className="lv up coll"
+            title={problem.collection_title}
+            aria-label={`Collection ${problem.collection_title}: choose another collection`}
+            onClick={() => c.browse('collection')}
+          >
+            {problem.collection_title}
+          </button>
+          <span className="sl up">/</span>
+          <button
+            className="lv up set"
+            title={problem.set_title}
+            aria-label={`Set ${problem.set_title}: show its problems`}
+            onClick={() => c.browse('set')}
+          >
+            {problem.set_title}
+          </button>
+          {problem.type && (
+            <>
+              <span className="sl">/</span>
+              <button
+                className="lv batch"
+                title={problem.type}
+                aria-label={`Batch ${problem.type}: show it in the overview`}
+                onClick={() => c.browse('batch')}
+              >
+                {problem.type}
+              </button>
+            </>
+          )}
+          <button
+            className="lv qt"
+            aria-expanded={open}
+            aria-label={`${open ? 'Hide' : 'Show'} question ${number}: ${problem.title}`}
+            onClick={() => c.toggleQuestion()}
+          >
             Q{number} · {problem.title}
-          </span>
-        </button>
+          </button>
+        </nav>
         <span className="vsep" />
         <button
           className="ib"
@@ -59,11 +90,12 @@ export function QuestionBar({ s, c, problem, detail }: Props) {
           <Chevron dir="right" />
         </button>
       </div>
-      {open && (
+      {/* Always mounted, so the statement can slide open and closed. */}
+      <div className="qwrap" inert={!open} aria-hidden={!open}>
         <div className="qb">
           <div className="qbody">{detail && <RichText text={detail.body} />}</div>
         </div>
-      )}
+      </div>
       <button
         className="grip"
         tabIndex={-1}

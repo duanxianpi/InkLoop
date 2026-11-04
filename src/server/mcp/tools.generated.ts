@@ -3,7 +3,7 @@
 export const TOOL_LIST = [
   {
     "name": "create_problems",
-    "description": "Create one or more problems in an existing Problem Set (set_id) or an explicitly new one (new_set). Problems keep the given order, never overwrite existing ones, and do not change the problem the user is viewing. Retrying with the same request_id returns the original IDs.",
+    "description": "Create one or more problems in an existing Problem Set (set_id) or an explicitly new one (new_set). Problems keep the given order, never overwrite existing ones, and do not change the problem the user is viewing. Retrying with the same request_id returns the original IDs. Levels: Collection (course) / Problem Set (week or unit) / batch (type: kind of exercise); the title is the topic. Call list_collections first and add to the week's existing set rather than creating another one.",
     "inputSchema": {
       "type": "object",
       "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -27,7 +27,8 @@ export const TOOL_LIST = [
             "title": {
               "type": "string",
               "minLength": 1,
-              "maxLength": 200
+              "maxLength": 200,
+              "description": "Second level, e.g. 'Week 8'. One set per week or unit: put different kinds of exercise in batches (type) of the same set, not in sets such as 'Week 8 · Practice'."
             },
             "collection_id": {
               "description": "Existing Collection for the new set.",
@@ -56,7 +57,8 @@ export const TOOL_LIST = [
               "title": {
                 "type": "string",
                 "minLength": 1,
-                "maxLength": 200
+                "maxLength": 200,
+                "description": "The problem's topic, e.g. 'Scaled dot-product attention'. No numbering, set or batch name: the board shows those."
               },
               "body": {
                 "type": "string",
@@ -65,10 +67,10 @@ export const TOOL_LIST = [
                 "description": "Problem statement; Markdown with $…$ / $$…$$ math. Raw HTML is not rendered."
               },
               "type": {
-                "description": "Optional category",
                 "type": "string",
                 "minLength": 1,
-                "maxLength": 50
+                "maxLength": 50,
+                "description": "Batch: the third level, grouping a set's problems by kind of exercise, e.g. 'Practice', 'Prediction', 'Translation'. Problems are numbered within their batch (Q1, Q2…). Never the topic: that is the title."
               }
             },
             "required": [
@@ -280,7 +282,7 @@ export const TOOL_LIST = [
   },
   {
     "name": "update_problem",
-    "description": "Change a problem's title, statement (body) or category (type; null removes it). The user's handwriting, Snapshots and feedback are kept.",
+    "description": "Change a problem's title (its topic), statement (body) or batch (type; null removes it). The user's handwriting, Snapshots and feedback are kept. To move a problem to another set use move_problems.",
     "inputSchema": {
       "type": "object",
       "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -302,12 +304,13 @@ export const TOOL_LIST = [
           "maxLength": 20000
         },
         "type": {
-          "description": "New category, or null to remove it.",
+          "description": "New batch, or null to remove it.",
           "anyOf": [
             {
               "type": "string",
               "minLength": 1,
-              "maxLength": 50
+              "maxLength": 50,
+              "description": "Batch: the third level, grouping a set's problems by kind of exercise, e.g. 'Practice', 'Prediction', 'Translation'. Problems are numbered within their batch (Q1, Q2…). Never the topic: that is the title."
             },
             {
               "type": "null"
@@ -352,6 +355,57 @@ export const TOOL_LIST = [
       "readOnlyHint": false,
       "destructiveHint": true,
       "idempotentHint": true,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "move_problems",
+    "description": "Move problems to the end of a Problem Set (any Collection), in the given order, optionally setting their batch (type). The user's handwriting, Snapshots and feedback move with them. Use it to reorganise sets, e.g. merge 'Week 8 · Practice' and 'Week 8 · Prediction' into one 'Week 8' set with batches 'Practice' and 'Prediction'; then delete the emptied sets.",
+    "inputSchema": {
+      "type": "object",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "problem_ids": {
+          "minItems": 1,
+          "maxItems": 50,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "description": "Problems to move, in the order they should take at the end of the set."
+        },
+        "set_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100,
+          "description": "Destination Problem Set; the current set reorders them to its end."
+        },
+        "type": {
+          "description": "Batch to put them in; null removes it; omit to keep each problem's batch.",
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 50,
+              "description": "Batch: the third level, grouping a set's problems by kind of exercise, e.g. 'Practice', 'Prediction', 'Translation'. Problems are numbered within their batch (Q1, Q2…). Never the topic: that is the title."
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "problem_ids",
+        "set_id"
+      ]
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
       "openWorldHint": false
     }
   },

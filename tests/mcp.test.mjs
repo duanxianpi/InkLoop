@@ -51,6 +51,7 @@ function fakeServices(calls = []) {
     organize: {
       updateProblem: record('organize.updateProblem', { problem_id: 'p1', title: 'T' }),
       deleteProblems: record('organize.deleteProblems', { deleted: ['p1'], not_found: [] }),
+      moveProblems: record('organize.moveProblems', { moved: ['p1'], set_id: 's1' }),
       renameSet: record('organize.renameSet', { set_id: 's1', title: 'T' }),
       renameCollection: record('organize.renameCollection', { collection_id: 'c1', title: 'T' }),
       deleteSet: record('organize.deleteSet', { deleted: 's1' }),
@@ -116,6 +117,7 @@ test('the official MCP client connects, lists and calls every tool', async () =>
         'get_problem',
         'update_problem',
         'delete_problems',
+        'move_problems',
         'update_problem_set',
         'update_collection',
         'delete_problem_set',
@@ -164,6 +166,7 @@ test('the official MCP client connects, lists and calls every tool', async () =>
       ['get_problem', { problem_id: 'p1' }],
       ['update_problem', { problem_id: 'p1', type: null }],
       ['delete_problems', { problem_ids: ['p1'] }],
+      ['move_problems', { problem_ids: ['p1'], set_id: 's1', type: 'Practice' }],
       ['update_problem_set', { set_id: 's1', title: 'T' }],
       ['update_collection', { collection_id: 'c1', title: 'T' }],
       ['delete_problem_set', { set_id: 's1' }],
@@ -190,6 +193,7 @@ test('the official MCP client connects, lists and calls every tool', async () =>
         'problems.get',
         'organize.updateProblem',
         'organize.deleteProblems',
+        'organize.moveProblems',
         'organize.renameSet',
         'organize.renameCollection',
         'organize.deleteSet',
@@ -229,7 +233,9 @@ test('protocol edges follow JSON-RPC and Streamable HTTP', async () => {
       capabilities: {},
       clientInfo: { name: 'c', version: '1' },
     });
-    assert.equal((await response.json()).result.protocolVersion, expected);
+    const { result } = await response.json();
+    assert.equal(result.protocolVersion, expected);
+    assert.match(result.instructions, /three levels/);
   }
 
   assert.deepEqual((await (await rpc('ping', undefined, 'a')).json()).result, {});

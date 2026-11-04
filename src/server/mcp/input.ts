@@ -4,6 +4,7 @@ import type {
   DeleteProblemsInput,
   GetSubmissionInput,
   ListProblemsInput,
+  MoveProblemsInput,
   UpdateProblemInput,
 } from '../../shared/schemas';
 import { LIMITS } from '../../shared/limits';
@@ -150,6 +151,20 @@ export function parseDeleteProblems(raw: unknown): DeleteProblemsInput {
     problem_ids: array(input.problem_ids, 'problem_ids', 1, LIMITS.createProblemsBatch).map(
       (value, index) => id(`problem_ids.${index}`)(value),
     ),
+  };
+}
+
+export function parseMoveProblems(raw: unknown): MoveProblemsInput {
+  const input = object(raw, 'arguments');
+  return {
+    problem_ids: array(input.problem_ids, 'problem_ids', 1, LIMITS.createProblemsBatch).map(
+      (value, index) => id(`problem_ids.${index}`)(value),
+    ),
+    set_id: id('set_id')(input.set_id),
+    type:
+      input.type === null
+        ? null
+        : optional(input.type, (value) => string(value, 'type', 1, LIMITS.typeLength)),
   };
 }
 

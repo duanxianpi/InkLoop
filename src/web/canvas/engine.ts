@@ -27,7 +27,6 @@ export interface EngineEvents {
   onHistory(canUndo: boolean, canRedo: boolean): void;
   /** The engine switched tools by itself (the eraser returning to the pen). */
   onTool(tool: Tool): void;
-  onPenMode(): void;
 }
 
 const EXTERNAL_CONTENT = [
@@ -46,6 +45,9 @@ export class Engine {
   private locked = false;
   private color: InkColor;
   private tool: Tool = 'draw';
+  private penMode: boolean;
+  /** The last pointer was a mouse, which always draws. */
+  private mouse = false;
   eraserSticky = false;
   private readonly cleanup: (() => void)[] = [];
 
@@ -56,7 +58,9 @@ export class Engine {
   ) {
     this.blank = editor.store.getStoreSnapshot('document');
     editor.user.updateUserPreferences({ colorScheme: 'light', edgeScrollSpeed: 0 });
-    editor.updateInstanceState({ isGridMode: false, isPenMode: options.penMode });
+    editor.updateInstanceState({ isGridMode: false });
+    this.penMode = options.penMode;
+    this.applyPenMode();
     this.color = options.color;
     this.applyStyles();
     editor.setCurrentTool('draw');
@@ -68,12 +72,17 @@ export class Engine {
       editor.store.listen(() => this.reportCamera(), { scope: 'session' }),
       editor.store.listen(() => events.onDocumentChange(), { source: 'user', scope: 'document' }),
       editor.store.listen(() => this.reportHistory()),
-      editor.store.listen(
-        () => {
-          if (editor.getInstanceState().isPenMode) events.onPenMode();
-        },
-        { scope: 'session' },
-      ),
+      // tldraw turns pen mode on whenever it sees a stylus; the setting decides instead.
+      editor.store.listen(() => this.applyPenMode(), { scope: 'session' }),
+    );
+    // Seen before tldraw's own handlers, so the mode is right for this very pointer.
+    const onPointerDown = (event: PointerEvent) => {
+      this.mouse = event.pointerType === 'mouse';
+      this.applyPenMode();
+    };
+    editor.getContainer().addEventListener('pointerdown', onPointerDown, true);
+    this.cleanup.push(() =>
+      editor.getContainer().removeEventListener('pointerdown', onPointerDown, true),
     );
     const onEvent = (info: { type: string; name: string }) => {
       if (
@@ -107,6 +116,7 @@ export class Engine {
     this.editor.clearHistory();
     // Loading a document resets the next-stroke styles to tldraw's defaults.
     this.applyStyles();
+    this.applyPenMode();
     this.setLocked(locked);
   }
 
@@ -134,6 +144,11 @@ export class Engine {
   setTool(tool: Tool) {
     this.tool = tool;
     if (!this.locked) this.editor.setCurrentTool(tool);
+  }
+  /** Pen mode: only a stylus (or a mouse) draws; fingers pan and zoom. */
+  setPenMode(on: boolean) {
+    this.penMode = on;
+    this.applyPenMode();
   }
   setColor(color: InkColor) {
     this.color = color;
@@ -163,6 +178,12 @@ export class Engine {
   private applyStyles() {
     this.editor.setStyleForNextShapes(DefaultSizeStyle, 's');
     this.editor.setStyleForNextShapes(DefaultColorStyle, this.color);
+  }
+
+  private applyPenMode() {
+    const on = this.penMode && !this.mouse;
+    if (this.editor.getInstanceState().isPenMode !== on)
+      this.editor.updateInstanceState({ isPenMode: on });
   }
 
   private reportCamera() {

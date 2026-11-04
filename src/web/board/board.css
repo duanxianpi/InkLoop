@@ -64,16 +64,13 @@
   inset: 0;
   touch-action: none;
 }
-/* All chrome is drawn at --chrome-scale (set by the design language; the POC used 75%): the layer
-   is laid out at 1/scale of the viewport and scaled down. Raise the scale for larger targets. */
+/* All chrome is drawn at --chrome-scale (set by the design language; the POC used 75%). It is
+   zoomed rather than transformed: a scale transform rasterises text and math at full size and
+   shrinks the bitmap, which blurs them (WebKit especially). Raise the scale for larger targets. */
 .chrome {
   position: absolute;
-  left: 0;
-  top: 0;
-  width: calc(100% / var(--chrome-scale));
-  height: calc(100% / var(--chrome-scale));
-  transform: scale(var(--chrome-scale));
-  transform-origin: 0 0;
+  inset: 0;
+  zoom: var(--chrome-scale);
   pointer-events: none;
   z-index: 400;
 }
@@ -184,6 +181,12 @@
   gap: 2px;
   padding: 4px;
   border-radius: var(--r-xl);
+  /* Above the unfolded question; it fades while the question is being read. */
+  z-index: 1;
+  transition: opacity 0.2s ease;
+}
+.chrome:has(.qbar.open .qwrap:is(:hover, :focus-within)) .rail:not(.withpop) {
+  opacity: 0.3;
 }
 .rail.left {
   left: calc(16px + var(--sal));
@@ -225,7 +228,8 @@
 }
 
 /* top-left: navigation */
-/* top-left: one title bar = overview icon · ‹ week / question › ; tapping the title unfolds the question inside the bar */
+/* top-left: one title bar = overview icon · collection / set / batch · question · ‹ › ; each level
+   opens the overview there, the question unfolds its statement inside the bar */
 .qbar {
   position: relative;
   flex: 0 1 660px;
@@ -235,6 +239,7 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  transition: box-shadow 0.22s ease;
 }
 .qbar.open {
   box-shadow: var(--sh2);
@@ -265,36 +270,48 @@
   flex: 1;
   min-width: 0;
   height: 42px;
-  padding: 0 8px;
-  border: 0;
-  border-radius: var(--r-m);
-  background: transparent;
+  padding: 0 2px;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 2px;
   font: 500 15px var(--ui);
-  text-align: left;
 }
-.qttl .wk {
+.qttl .lv {
+  height: 34px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: var(--r-s);
+  background: transparent;
   color: var(--muted);
+  font: inherit;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   flex: 0 1 auto;
   min-width: 24px;
 }
+/* When space runs out the collection gives way first; set and batch stay readable. */
+.qttl .coll {
+  flex-shrink: 20;
+  min-width: 3em;
+}
+.qttl .set,
+.qttl .batch {
+  flex-shrink: 0;
+  max-width: 9em;
+}
+.qttl .lv:hover {
+  background: var(--soft);
+  color: var(--ink);
+}
 .qttl .sl {
   color: var(--off);
   flex: none;
 }
 .qttl .qt {
-  /* Same weight and colour as the set name: the bar reads as one line, not two levels. */
-  color: var(--muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  flex: 0 10 auto;
-  min-width: 0;
+  /* Same weight and colour as the levels: the bar reads as one line, not two levels. */
+  min-width: 80px;
+  margin-left: 4px;
 }
 /* expand/collapse affordance: a small grip on the bar's bottom edge instead of another arrow */
 .grip {
@@ -327,13 +344,44 @@
 .qbar.open .grip::after {
   width: 36px;
 }
-.qbar .qb {
-  flex: 1 1 auto;
+/* the statement slides open: a grid row animated from 0fr to 1fr */
+.qwrap {
+  display: grid;
+  grid-template-rows: 0fr;
+  flex: 0 1 auto;
   min-height: 0;
-  border-top: 1px solid var(--line-soft);
-  padding: 16px 24px 20px;
+  overflow: hidden;
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    grid-template-rows 0.24s cubic-bezier(0.2, 0.7, 0.2, 1),
+    opacity 0.18s ease,
+    visibility 0s linear 0.24s;
+}
+.qbar.open .qwrap {
+  grid-template-rows: 1fr;
+  opacity: 1;
+  visibility: visible;
+  transition:
+    grid-template-rows 0.24s cubic-bezier(0.2, 0.7, 0.2, 1),
+    opacity 0.18s ease 0.04s,
+    visibility 0s;
+}
+/* no padding or border here: they would hold the closed row open */
+.qbar .qb {
+  min-height: 0;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
+}
+.qbar .qb > .qbody {
+  border-top: 1px solid var(--line-soft);
+  padding: 16px 24px 20px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .qwrap,
+  .qbar.open .qwrap {
+    transition: none;
+  }
 }
 .qbar .qb .qbody {
   margin-top: 0;
@@ -361,10 +409,9 @@
   width: 38px;
 }
 .narrow .qttl {
-  padding: 0 4px;
+  padding: 0;
 }
-.narrow .qttl .wk,
-.narrow .qttl .sl {
+.narrow .qttl .up {
   display: none;
 }
 .qrow .ovb[aria-expanded='true'] {
@@ -921,6 +968,12 @@
   flex-direction: column;
   gap: 10px;
 }
+.sec.focus {
+  margin: -8px -12px;
+  padding: 8px 12px;
+  border-radius: var(--r-m);
+  background: var(--soft);
+}
 .sec h4 {
   margin: 0;
   font-size: 11px;
@@ -1144,21 +1197,6 @@
 }
 .pbtn:disabled {
   color: var(--off);
-}
-.gest {
-  position: absolute;
-  left: 50%;
-  top: 40%;
-  transform: translate(-50%, -50%);
-  padding: 10px 16px;
-  border-radius: var(--r-m);
-  background: var(--toast);
-  color: var(--on-accent);
-  font-weight: 600;
-  font-size: 14px;
-  pointer-events: none;
-  z-index: 500;
-  animation: fade 0.7s forwards;
 }
 /* new-problem dot in the collection menu; account links styled like the settings buttons */
 .collmenu .cdot {

@@ -20,6 +20,16 @@ import { callTool, IMAGE_DATA, isToolName, type ToolResult } from './tools';
  */
 const PROTOCOL_VERSIONS = ['2025-11-25', '2025-06-18'];
 const SERVER_INFO = { name: 'inkloop', version: '0.1.0' };
+/** How the board organises problems; MCP clients pass this to the model. */
+const INSTRUCTIONS = `InkLoop is a handwriting board: the user answers problems by hand and you review them.
+
+Problems are organised in three levels, shown together in the board's title bar:
+1. Collection: a course or subject, e.g. "CSC2516".
+2. Problem Set: a week or unit of it, e.g. "Week 8". One set per week; never encode the batch in the set title (not "Week 8 · Practice").
+3. Batch (the problem's \`type\`): a kind of exercise within the set, e.g. "Practice", "Prediction", "Translation". Problems are numbered within their batch.
+The problem title is its topic, e.g. "Scaled dot-product attention", without numbering.
+
+Before creating problems, call list_collections and add to the existing Collection and set when they match. Use move_problems, update_problem and update_problem_set to fix an organisation that does not follow this.`;
 /** Static brand icon, versioned in its name because /assets/* is cached as immutable. */
 const BRAND_ICON = '/assets/brand/inkloop-v2';
 
@@ -147,6 +157,7 @@ export async function handleMcp(
             ? requested
             : PROTOCOL_VERSIONS[0],
           capabilities: { tools: {} },
+          instructions: INSTRUCTIONS,
           serverInfo: {
             ...SERVER_INFO,
             title: 'InkLoop',
@@ -161,7 +172,7 @@ export async function handleMcp(
       case 'ping':
         return result(id, {});
       case 'tools/list':
-        // Generated at build time from the zod schemas; four tools, so no pagination.
+        // Generated at build time from the zod schemas; a dozen tools, so no pagination.
         return result(id, { tools: TOOL_LIST });
       case 'tools/call': {
         // An unknown tool is a protocol error; anything wrong after that is a tool result.

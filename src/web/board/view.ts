@@ -24,17 +24,23 @@ export const hhmm = (time: string | number) => {
   );
 };
 
-/** Problems of one set in their navigation order. */
-export const inSet = (problems: ProblemSummary[], setId: string) =>
-  problems
+/** The batch (third level: Collection / Set / Batch) a problem belongs to. */
+export const batchOf = (problem: ProblemSummary) => problem.type ?? 'Problems';
+
+/** Problems of one set in their navigation order: batch by batch, each in its own order. */
+export function inSet(problems: ProblemSummary[], setId: string) {
+  const ordered = problems
     .filter((problem) => problem.set_id === setId)
     .sort((a, b) => a.sort_order - b.sort_order);
+  const batches = [...new Set(ordered.map(batchOf))];
+  return ordered.sort((a, b) => batches.indexOf(batchOf(a)) - batches.indexOf(batchOf(b)));
+}
 
+/** Problems are numbered within their batch. */
 export const numberOf = (problems: ProblemSummary[], problem: ProblemSummary) =>
-  inSet(problems, problem.set_id).indexOf(problem) + 1;
-
-/** Short form of a set title for narrow screens: "W7 · Variational inference" → "W7". */
-export const shortSet = (title: string) => title.split(' · ')[0];
+  inSet(problems, problem.set_id)
+    .filter((other) => batchOf(other) === batchOf(problem))
+    .indexOf(problem) + 1;
 
 export const snapshotOf = (detail: ProblemDetail, id: string): SnapshotSummary | undefined =>
   detail.snapshots.find((snapshot) => snapshot.id === id);

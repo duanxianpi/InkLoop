@@ -119,7 +119,7 @@ await db
 const w7 = await mcp('create_problems', {
   request_id: 'seed-w7',
   new_set: {
-    title: 'W7 · Variational inference',
+    title: 'Week 7',
     new_collection_title: 'CSC2506 · Probabilistic Learning',
   },
   problems: [
@@ -142,7 +142,7 @@ const w7 = await mcp('create_problems', {
 });
 await mcp('create_problems', {
   request_id: 'seed-w6',
-  new_set: { title: 'W6 · EM and mixtures', collection_id: w7.collection_id },
+  new_set: { title: 'Week 6', collection_id: w7.collection_id },
   problems: [
     {
       title: 'E-step responsibilities',

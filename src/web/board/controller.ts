@@ -21,12 +21,16 @@ export interface Prefs {
   eraserSticky: boolean;
   autoUnfold: boolean;
   color: InkColor;
+  /** Only a stylus draws; fingers pan. Per device, so never sent to the account. */
+  penMode: boolean;
 }
 export interface Ui {
   overview: boolean;
   /** Collection / set browsed in the Overview (null: the current problem's). */
   coll: string | null;
   set: string | null;
+  /** Batch section the Overview scrolls to and highlights. */
+  batch: string | null;
   collMenu: boolean;
   /** The question unfolded in the Question Bar. */
   qpop: boolean;
@@ -56,13 +60,13 @@ export interface BoardState {
   ui: Ui;
   narrow: boolean;
   hint: { id: number; text: string } | null;
-  gesture: { id: number; text: string } | null;
 }
 
 const CLOSED: Ui = {
   overview: false,
   coll: null,
   set: null,
+  batch: null,
   collMenu: false,
   qpop: false,
   fb: false,
@@ -75,6 +79,7 @@ const DEFAULT_PREFS: Prefs = {
   eraserSticky: false,
   autoUnfold: false,
   color: 'black',
+  penMode: true,
 };
 const LOCKED_HINT = 'Ready for Review. Resume editing to make changes.';
 const CAPTURE_DELAY_MS = 800;
@@ -122,7 +127,6 @@ export class BoardController {
     ui: CLOSED,
     narrow: innerWidth < NARROW,
     hint: null,
-    gesture: null,
   });
   private engine: Engine | null = null;
   private engineWaiters: ((engine: Engine) => void)[] = [];
@@ -223,12 +227,10 @@ export class BoardController {
     this.applyPrefs(engine);
     engine.load(null, true);
     this.detachGestures = attachGestures(engine, engine.container, {
-      penSeen: () => local.get('pen', false),
+      penMode: () => this.state.prefs.penMode,
       strokeStart: this.strokeStart,
       strokeEnd: this.strokeEnd,
       lockedAttempt: () => this.hint(LOCKED_HINT, true),
-      tapUndo: () => this.tapHistory('undo'),
-      tapRedo: () => this.tapHistory('redo'),
     });
     // Any direct camera interaction keeps the current camera instead of the computed default.
     const touched = () => (this.defaultCamera = false);
@@ -253,6 +255,7 @@ export class BoardController {
   private applyPrefs(engine: Engine) {
     engine.eraserSticky = this.state.prefs.eraserSticky;
     engine.setColor(this.state.prefs.color);
+    engine.setPenMode(this.state.prefs.penMode);
   }
 
   /** Engine callbacks. */
@@ -269,9 +272,6 @@ export class BoardController {
         this.set({ canUndo, canRedo });
     },
     onTool: (tool: Tool) => this.set({ tool }),
-    onPenMode: () => {
-      if (!local.get('pen', false)) local.set('pen', true);
-    },
   };
 
   private strokeStart = () => {
@@ -313,7 +313,9 @@ export class BoardController {
     this.frame = requestAnimationFrame(() => {
       if (this.world) {
         const { world, under } = this.world;
-        world.style.transform = `translate(${camera.x}px, ${camera.y}px) scale(${camera.z})`;
+        // Whole device pixels: a fractional offset resamples the printed question and blurs it.
+        const snap = (value: number) => Math.round(value * devicePixelRatio) / devicePixelRatio;
+        world.style.transform = `translate(${snap(camera.x)}px, ${snap(camera.y)}px) scale(${camera.z})`;
         const grid = 28 * camera.z;
         under.style.backgroundSize = `${grid}px ${grid}px`;
         under.style.backgroundPosition = `${camera.x}px ${camera.y}px`;
@@ -627,11 +629,6 @@ export class BoardController {
   redo() {
     this.engine?.redo();
   }
-  private tapHistory(action: 'undo' | 'redo') {
-    if (this.engine?.isLocked) return;
-    this.engine?.[action]();
-    this.toast(action === 'undo' ? 'Undo' : 'Redo');
-  }
 
   setPrefs(patch: Partial<Prefs>) {
     const prefs = { ...this.state.prefs, ...patch };
@@ -642,7 +639,8 @@ export class BoardController {
       this.auto.opened = false;
       this.ui({ qpop: false });
     }
-    void api.updatePreferences(toPreferences(patch)).catch(() => undefined);
+    const values = toPreferences(patch);
+    if (Object.keys(values).length) void api.updatePreferences(values).catch(() => undefined);
   }
 
   // ---------------------------------------------------------------- answer state
@@ -912,7 +910,22 @@ export class BoardController {
       qpop: false,
       coll: null,
       set: null,
+      batch: null,
       collMenu: false,
+      settings: false,
+      colors: false,
+      fb: false,
+    });
+  }
+  /** The title bar's levels: each opens the Overview at the current problem's level. */
+  browse(level: 'collection' | 'set' | 'batch') {
+    this.ui({
+      overview: true,
+      qpop: false,
+      coll: null,
+      set: null,
+      batch: level === 'batch' ? (this.currentSummary()?.type ?? null) : null,
+      collMenu: level === 'collection',
       settings: false,
       colors: false,
       fb: false,
@@ -925,11 +938,11 @@ export class BoardController {
     this.ui({ collMenu: !this.state.ui.collMenu });
   }
   chooseCollection(id: string) {
-    this.ui({ coll: id, set: null, collMenu: false });
+    this.ui({ coll: id, set: null, batch: null, collMenu: false });
   }
   chooseSet(id: string) {
     const collection = this.state.collections.find((c) => c.sets.some((s) => s.id === id));
-    this.ui({ set: id, coll: collection?.id ?? null, collMenu: false });
+    this.ui({ set: id, coll: collection?.id ?? null, batch: null, collMenu: false });
   }
   toggleQuestion() {
     const { qpop } = this.state.ui;
@@ -958,11 +971,6 @@ export class BoardController {
     const id = ++this.toastId;
     this.set({ hint: { id, text } });
     setTimeout(() => this.state.hint?.id === id && this.set({ hint: null }), 2500);
-  }
-  private toast(text: string) {
-    const id = ++this.toastId;
-    this.set({ gesture: { id, text } });
-    setTimeout(() => this.state.gesture?.id === id && this.set({ gesture: null }), 800);
   }
 
   private onKey = (event: KeyboardEvent) => {

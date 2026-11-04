@@ -107,6 +107,11 @@ function Settings({ s, c }: { s: BoardState; c: BoardController }) {
       <div className="grp">
         <h3>Writing</h3>
         <Toggle
+          on={s.prefs.penMode}
+          label="Pen mode: only the stylus writes, fingers move the page"
+          onClick={() => c.setPrefs({ penMode: !s.prefs.penMode })}
+        />
+        <Toggle
           on={s.prefs.hand === 'left'}
           label="Left-handed"
           onClick={() => c.setPrefs({ hand: s.prefs.hand === 'left' ? 'right' : 'left' })}
@@ -121,7 +126,6 @@ function Settings({ s, c }: { s: BoardState; c: BoardController }) {
           label="Unfold the question when it scrolls out of view"
           onClick={() => c.setPrefs({ autoUnfold: !s.prefs.autoUnfold })}
         />
-        <div className="cap">Two-finger tap undoes, three-finger tap redoes.</div>
       </div>
       <div className="grp">
         <h3>Account</h3>

@@ -48,11 +48,6 @@ export function Board() {
           <Notice s={s} c={controller} />
         )}
       </div>
-      {s.gesture && (
-        <div key={s.gesture.id} className="gest">
-          {s.gesture.text}
-        </div>
-      )}
     </div>
   );
 }
@@ -68,7 +63,7 @@ const Canvas = memo(function Canvas({ c }: { c: BoardController }) {
         inferDarkMode={false}
         onMount={(editor) => {
           const engine = new Engine(editor, c.events, {
-            penMode: readPenMode(),
+            penMode: c.state.prefs.penMode,
             color: c.state.prefs.color,
           });
           c.attachEngine(engine);
@@ -81,14 +76,6 @@ const Canvas = memo(function Canvas({ c }: { c: BoardController }) {
     </div>
   );
 });
-
-function readPenMode() {
-  try {
-    return localStorage.getItem('inkloop:pen') === 'true';
-  } catch {
-    return false;
-  }
-}
 
 /** The dotted board and the printed question tile, transformed with the camera. */
 function World({
@@ -150,6 +137,12 @@ function QuestionTile({
   return (
     <div className="qtile" id="qtile" ref={tile}>
       <div className="qmeta">
+        {problem.type && (
+          <>
+            <span>{problem.type}</span>
+            <i />
+          </>
+        )}
         <span>Q{number}</span>
         <i />
         <span className="tt">{problem.title}</span>

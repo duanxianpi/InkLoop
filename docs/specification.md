@@ -248,10 +248,11 @@ Mouse interactions:
 
 Preserve the interaction concepts demonstrated by the POC:
 
-- Two-finger tap: Undo.
-- Three-finger tap: Redo.
 - Pinch: Zoom.
 - Touch pan: Move Canvas.
+- Pen mode (a Writing setting, on by default, remembered per device): only the stylus or a mouse writes; one finger pans.
+
+Undo and Redo are the rail buttons and keyboard shortcuts; there are no multi-finger tap gestures.
 
 The gesture recognizer must not break ordinary native zooming and panning.
 
@@ -359,20 +360,24 @@ Do not directly inject arbitrary HTML or SVG from MCP arguments into the DOM.
 
 Use a lightweight hierarchy:
 
-**Collection → Problem Set → Problem**
+**Collection → Problem Set → Batch → Problem**
 
-A Collection may represent a course or broader topic.
+A Collection represents a course or broader topic.
 
-A Problem Set may represent a week, assignment, or exercise batch.
+A Problem Set represents a week or unit; one set per week.
 
-Problems may have an optional category/type for grouping.
+A batch (the problem's optional `type`) groups a set's problems by kind of exercise. Problems are numbered within their batch.
+
+The problem title is its topic.
 
 Examples:
 
-- Collection: Probabilistic Models
-- Set: W7 · Variational Inference
-- Category: Derivations
-- Problem: KL Between Gaussians
+- Collection: CSC2516
+- Set: Week 8
+- Batch: Prediction
+- Problem: Scaled dot-product attention
+
+The title bar shows all three levels; each opens the Overview at that level (the collection menu, the set, the batch's section), and the question unfolds its statement.
 
 This structure is for organization only. It must not evolve into an LMS.
 
@@ -851,7 +856,7 @@ The production schema should represent the following entities.
 | `set_id`                    | Parent Problem Set                         |
 | `title`                     | Question title                             |
 | `body`                      | Problem statement, including math notation |
-| `type`                      | Optional category                          |
+| `type`                      | Optional batch                             |
 | `sort_order`                | Position in set                            |
 | `answer_state`              | `working` or `ready_for_review`            |
 | `latest_snapshot_seq`       | Latest committed Snapshot sequence         |

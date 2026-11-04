@@ -4,20 +4,14 @@ import type { Engine } from './engine';
 // the engine's own gestures (pinch zoom, two-finger pan):
 // - pen-down tracking, so nothing in the interface re-renders or moves during a stroke;
 // - on a locked canvas the pen (or mouse) does nothing and a short explanation follows on lift;
-// - once a pen has been seen, one finger pans instead of drawing;
-// - two-finger tap undoes, three-finger tap redoes.
+// - in pen mode, one finger pans instead of drawing.
 
 export interface GestureHandlers {
-  penSeen(): boolean;
+  penMode(): boolean;
   strokeStart(): void;
   strokeEnd(): void;
   lockedAttempt(): void;
-  tapUndo(): void;
-  tapRedo(): void;
 }
-
-const TAP_MS = 320;
-const TAP_SLOP = 14;
 
 export function attachGestures(engine: Engine, element: HTMLElement, handlers: GestureHandlers) {
   const cleanup: (() => void)[] = [];
@@ -47,7 +41,7 @@ export function attachGestures(engine: Engine, element: HTMLElement, handlers: G
     const stroke =
       event.pointerType === 'pen' ||
       (event.pointerType === 'mouse' && event.button === 0) ||
-      (event.pointerType === 'touch' && !handlers.penSeen());
+      (event.pointerType === 'touch' && !handlers.penMode());
     if (!stroke || spaceHeld || event.button === 1) return;
     if (engine.isLocked && event.pointerType !== 'touch') {
       event.stopPropagation();
@@ -67,14 +61,14 @@ export function attachGestures(engine: Engine, element: HTMLElement, handlers: G
   on(window, 'pointerup', up);
   on(window, 'pointercancel', up);
 
-  // One-finger pan while the pen draws.
+  // One-finger pan in pen mode.
   const touches = new Set<number>();
   let pan: { id: number; x: number; y: number } | null = null;
   on(element, 'pointerdown', (event) => {
     if (event.pointerType !== 'touch') return;
     touches.add(event.pointerId);
     pan =
-      touches.size === 1 && handlers.penSeen()
+      touches.size === 1 && handlers.penMode()
         ? { id: event.pointerId, x: event.clientX, y: event.clientY }
         : null;
   });
@@ -96,41 +90,6 @@ export function attachGestures(engine: Engine, element: HTMLElement, handlers: G
   };
   on(element, 'pointerup', touchEnd);
   on(element, 'pointercancel', touchEnd);
-
-  // Multi-finger taps.
-  const fingers = new Set<number>();
-  let tap: {
-    start: number;
-    most: number;
-    moved: number;
-    origin: Map<number, [number, number]>;
-  } | null = null;
-  on(element, 'pointerdown', (event) => {
-    if (event.pointerType !== 'touch') return;
-    fingers.add(event.pointerId);
-    tap ??= { start: performance.now(), most: 0, moved: 0, origin: new Map() };
-    tap.origin.set(event.pointerId, [event.clientX, event.clientY]);
-    tap.most = Math.max(tap.most, fingers.size);
-  });
-  on(element, 'pointermove', (event) => {
-    const origin = tap?.origin.get(event.pointerId);
-    if (!tap || !origin) return;
-    tap.moved = Math.max(
-      tap.moved,
-      Math.hypot(event.clientX - origin[0], event.clientY - origin[1]),
-    );
-  });
-  const tapEnd = (event: PointerEvent) => {
-    if (event.pointerType !== 'touch') return;
-    fingers.delete(event.pointerId);
-    if (fingers.size || !tap) return;
-    const quick = performance.now() - tap.start < TAP_MS && tap.moved < TAP_SLOP;
-    if (quick && tap.most === 2) handlers.tapUndo();
-    else if (quick && tap.most >= 3) handlers.tapRedo();
-    tap = null;
-  };
-  on(element, 'pointerup', tapEnd);
-  on(element, 'pointercancel', tapEnd);
 
   // Safari's page pinch would zoom the whole interface instead of the canvas.
   on(document, 'gesturestart' as keyof HTMLElementEventMap, (event) => event.preventDefault(), {

@@ -1,5 +1,9 @@
 import { DomainError } from '../../shared/errors';
-import type { DeleteProblemsInput, UpdateProblemInput } from '../../shared/schemas';
+import type {
+  DeleteProblemsInput,
+  MoveProblemsInput,
+  UpdateProblemInput,
+} from '../../shared/schemas';
 import type { AppContext } from '../env';
 import { requireProblem } from './problems';
 import { bumpCounter, commit, committedSeq, notify, now } from './store';
@@ -80,6 +84,60 @@ export function organizeService(ctx: AppContext) {
       if (keys.length) await ctx.storage.delete(keys).catch(() => undefined);
       const found = problems.map((row) => row.id);
       return { deleted: found, not_found: ids.filter((value) => !found.includes(value)) };
+    },
+
+    /**
+     * Move problems to the end of a set, in the given order, optionally into one batch. Handwriting,
+     * Snapshots and feedback belong to the problem and move with it.
+     */
+    async moveProblems(input: MoveProblemsInput) {
+      const ids = [...new Set(input.problem_ids)];
+      const json = JSON.stringify(ids);
+      const set = await ctx.db
+        .prepare('SELECT id FROM problem_sets WHERE id = ?')
+        .bind(input.set_id)
+        .first();
+      if (!set) throw new DomainError('not_found', 'Problem Set not found');
+      const time = now();
+      const { ok } = await write(
+        {
+          sql: `EXISTS (SELECT 1 FROM problem_sets WHERE id = ?)
+            AND (SELECT COUNT(*) FROM problems WHERE id IN (SELECT value FROM json_each(?))) = ?`,
+          binds: [input.set_id, json, ids.length],
+        },
+        ids.map((problemId) =>
+          ctx.db
+            .prepare(
+              `UPDATE problems SET set_id = ?1,
+                 sort_order = (SELECT COALESCE(MAX(sort_order), 0) + 1 FROM problems WHERE set_id = ?1),
+                 type = CASE WHEN ?2 THEN ?3 ELSE type END, updated_at = ?4 WHERE id = ?5`,
+            )
+            .bind(
+              input.set_id,
+              input.type !== undefined ? 1 : 0,
+              input.type ?? null,
+              time,
+              problemId,
+            ),
+        ),
+      );
+      if (!ok) {
+        const { results } = await ctx.db
+          .prepare('SELECT id FROM problems WHERE id IN (SELECT value FROM json_each(?))')
+          .bind(json)
+          .all<{ id: string }>();
+        const found = results.map((row) => row.id);
+        const missing = ids.filter((value) => !found.includes(value));
+        throw new DomainError(
+          'not_found',
+          missing.length ? 'Problems not found: ' + missing.join(', ') : 'Problem Set not found',
+        );
+      }
+      return {
+        moved: ids,
+        set_id: input.set_id,
+        ...(input.type !== undefined && { type: input.type }),
+      };
     },
 
     async renameSet(setId: string, title: string) {

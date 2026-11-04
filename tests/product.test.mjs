@@ -620,6 +620,32 @@ test('agents can read, edit and remove problems, sets and collections', async ()
       'not_found',
     );
 
+    // move_problems: to the end of another set, into a batch; all or nothing.
+    const other = await call('create_problems', {
+      request_id: 'org-3',
+      new_set: { title: 'W1 · Practice', collection_id: created.collection_id },
+      problems: [{ title: 'Moved', body: 'Move me.' }],
+    });
+    const [p3] = other.problem_ids;
+    assert.equal(
+      (await call('move_problems', { problem_ids: [p3, 'missing'], set_id: created.set_id })).error,
+      'not_found',
+    );
+    assert.equal((await call('get_problem', { problem_id: p3 })).set_id, other.set_id);
+    assert.deepEqual(
+      await call('move_problems', { problem_ids: [p3], set_id: created.set_id, type: 'Practice' }),
+      { moved: [p3], set_id: created.set_id, type: 'Practice' },
+    );
+    const moved = await call('get_problem', { problem_id: p3 });
+    assert.deepEqual(
+      [moved.set_id, moved.set_title, moved.type, moved.sort_order],
+      [created.set_id, 'Week 1', 'Practice', 3],
+    );
+    assert.deepEqual(await call('delete_problem_set', { set_id: other.set_id }), {
+      deleted: other.set_id,
+    });
+    await call('delete_problems', { problem_ids: [p3] });
+
     // A set or collection with problems is not deleted.
     assert.equal(
       (await call('delete_problem_set', { set_id: created.set_id })).error,

@@ -8,14 +8,30 @@ export const idempotencyKey = z.string().min(1).max(LIMITS.idempotencyKeyLength)
 export const verdict = z.enum(['correct', 'partial', 'incorrect']);
 export const answerState = z.enum(['working', 'ready_for_review']);
 
+// The board organises problems in three levels: Collection (a course) / Problem Set (a week or
+// unit) / batch (`type`: a kind of exercise within the set). The title is the problem's topic.
+const batch = z
+  .string()
+  .min(1)
+  .max(LIMITS.typeLength)
+  .describe(
+    "Batch: the third level, grouping a set's problems by kind of exercise, e.g. 'Practice', 'Prediction', 'Translation'. Problems are numbered within their batch (Q1, Q2…). Never the topic: that is the title.",
+  );
+
 export const problemInput = z.object({
-  title: z.string().min(1).max(LIMITS.titleLength),
+  title: z
+    .string()
+    .min(1)
+    .max(LIMITS.titleLength)
+    .describe(
+      "The problem's topic, e.g. 'Scaled dot-product attention'. No numbering, set or batch name: the board shows those.",
+    ),
   body: z
     .string()
     .min(1)
     .max(LIMITS.bodyLength)
     .describe('Problem statement; Markdown with $…$ / $$…$$ math. Raw HTML is not rendered.'),
-  type: z.string().min(1).max(LIMITS.typeLength).optional().describe('Optional category'),
+  type: batch.optional(),
 });
 
 export const createProblemsInput = z
@@ -28,7 +44,13 @@ export const createProblemsInput = z
       .describe('Existing Problem Set to append to. Provide exactly one of set_id or new_set.'),
     new_set: z
       .object({
-        title: z.string().min(1).max(LIMITS.titleLength),
+        title: z
+          .string()
+          .min(1)
+          .max(LIMITS.titleLength)
+          .describe(
+            "Second level, e.g. 'Week 8'. One set per week or unit: put different kinds of exercise in batches (type) of the same set, not in sets such as 'Week 8 · Practice'.",
+          ),
         collection_id: id.optional().describe('Existing Collection for the new set.'),
         new_collection_title: z
           .string()
@@ -88,13 +110,7 @@ export const updateProblemInput = z
       .max(LIMITS.bodyLength)
       .optional()
       .describe('New problem statement; Markdown with $…$ / $$…$$ math.'),
-    type: z
-      .string()
-      .min(1)
-      .max(LIMITS.typeLength)
-      .nullable()
-      .optional()
-      .describe('New category, or null to remove it.'),
+    type: batch.nullable().optional().describe('New batch, or null to remove it.'),
   })
   .refine(
     (value) => value.title !== undefined || value.body !== undefined || value.type !== undefined,
@@ -106,6 +122,20 @@ export const deleteProblemsInput = z.object({
   problem_ids: z.array(id).min(1).max(LIMITS.createProblemsBatch),
 });
 export type DeleteProblemsInput = z.infer<typeof deleteProblemsInput>;
+
+export const moveProblemsInput = z.object({
+  problem_ids: z
+    .array(id)
+    .min(1)
+    .max(LIMITS.createProblemsBatch)
+    .describe('Problems to move, in the order they should take at the end of the set.'),
+  set_id: id.describe('Destination Problem Set; the current set reorders them to its end.'),
+  type: batch
+    .nullable()
+    .optional()
+    .describe("Batch to put them in; null removes it; omit to keep each problem's batch."),
+});
+export type MoveProblemsInput = z.infer<typeof moveProblemsInput>;
 
 export const updateProblemSetInput = z.object({
   set_id: id,

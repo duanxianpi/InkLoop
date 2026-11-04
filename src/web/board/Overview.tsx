@@ -1,7 +1,8 @@
+import { useEffect, useRef } from 'react';
 import type { ProblemSummary } from '../../shared/model';
 import type { BoardController, BoardState } from './controller';
 import { Chevron } from './icons';
-import { inSet, numberOf, TILE_CLASS, TILE_LABEL, trendBadge } from './view';
+import { batchOf, inSet, numberOf, TILE_CLASS, TILE_LABEL, trendBadge } from './view';
 
 const LEGEND = [
   ['empty', 'Not started'],
@@ -12,7 +13,7 @@ const LEGEND = [
   ['incorrect', 'Incorrect'],
 ] as const;
 
-/** Problem Overview (§6.3): collection menu, set chips, categories and numbered status tiles. */
+/** Problem Overview (§6.3): collection menu, set chips, batches and numbered status tiles. */
 export function Overview({
   s,
   c,
@@ -26,6 +27,8 @@ export function Overview({
     s.collections.find((entry) => entry.id === s.ui.coll) ??
     s.collections.find((entry) => entry.id === current.collection_id) ??
     s.collections[0];
+  const focused = useRef<HTMLDivElement>(null);
+  useEffect(() => focused.current?.scrollIntoView({ block: 'nearest' }), [s.ui.batch]);
   if (!collection) return null;
   const setIds = collection.sets.map((set) => set.id);
   const setId = setIds.includes(s.ui.set ?? '')
@@ -34,7 +37,7 @@ export function Overview({
       ? current.set_id
       : setIds.at(-1);
   const problems = setId ? inSet(s.problems, setId) : [];
-  const types = [...new Set(problems.map((problem) => problem.type ?? 'Problems'))];
+  const batches = [...new Set(problems.map(batchOf))];
   const isNew = (problem: ProblemSummary) => s.newIds.includes(problem.id);
 
   const tile = (problem: ProblemSummary) => {
@@ -105,14 +108,21 @@ export function Overview({
         </div>
       )}
       <div className="ovscroll">
-        {types.map((type) => (
-          <div key={type} className="sec">
-            <h4>{type}</h4>
-            <div className="tiles">
-              {problems.filter((problem) => (problem.type ?? 'Problems') === type).map(tile)}
+        {batches.map((batch) => {
+          const isFocused = setId === current.set_id && batch === s.ui.batch;
+          return (
+            <div
+              key={batch}
+              className={`sec${isFocused ? ' focus' : ''}`}
+              ref={isFocused ? focused : undefined}
+            >
+              <h4>{batch}</h4>
+              <div className="tiles">
+                {problems.filter((problem) => batchOf(problem) === batch).map(tile)}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
       <div className="legend">
         {LEGEND.map(([key, label]) => (

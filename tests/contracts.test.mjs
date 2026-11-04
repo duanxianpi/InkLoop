@@ -155,6 +155,17 @@ test('MCP input validators accept and reject exactly what the zod contracts do',
         { problem_ids: 'a' },
       ],
     ],
+    parseMoveProblems: [
+      schemas.moveProblemsInput,
+      [
+        { problem_ids: ['a', 'b'], set_id: 's' },
+        { problem_ids: ['a'], set_id: 's', type: 'Practice' },
+        { problem_ids: ['a'], set_id: 's', type: null },
+        { problem_ids: ['a'], set_id: 's', type: '' },
+        { problem_ids: [], set_id: 's' },
+        { problem_ids: ['a'] },
+      ],
+    ],
     parseUpdateProblemSet: [
       schemas.updateProblemSetInput,
       [{ set_id: 's', title: 'T' }, { set_id: 's', title: '' }, { title: 'T' }],

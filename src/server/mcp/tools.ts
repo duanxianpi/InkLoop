@@ -10,6 +10,7 @@ import {
   getSubmissionInput,
   listCollectionsInput,
   listProblemsInput,
+  moveProblemsInput,
   updateCollectionInput,
   updateProblemInput,
   updateProblemSetInput,
@@ -27,6 +28,7 @@ import {
   parseGetSubmission,
   parseListCollections,
   parseListProblems,
+  parseMoveProblems,
   parseUpdateCollection,
   parseUpdateProblem,
   parseUpdateProblemSet,
@@ -68,7 +70,7 @@ const ok = (data: Record<string, unknown>): ToolResult => ({
 export const TOOLS = {
   create_problems: {
     description:
-      'Create one or more problems in an existing Problem Set (set_id) or an explicitly new one (new_set). Problems keep the given order, never overwrite existing ones, and do not change the problem the user is viewing. Retrying with the same request_id returns the original IDs.',
+      "Create one or more problems in an existing Problem Set (set_id) or an explicitly new one (new_set). Problems keep the given order, never overwrite existing ones, and do not change the problem the user is viewing. Retrying with the same request_id returns the original IDs. Levels: Collection (course) / Problem Set (week or unit) / batch (type: kind of exercise); the title is the topic. Call list_collections first and add to the week's existing set rather than creating another one.",
     annotations: {
       readOnlyHint: false,
       destructiveHint: false,
@@ -154,7 +156,7 @@ export const TOOLS = {
 
   update_problem: {
     description:
-      "Change a problem's title, statement (body) or category (type; null removes it). The user's handwriting, Snapshots and feedback are kept.",
+      "Change a problem's title (its topic), statement (body) or batch (type; null removes it). The user's handwriting, Snapshots and feedback are kept. To move a problem to another set use move_problems.",
     annotations: {
       readOnlyHint: false,
       destructiveHint: false,
@@ -181,6 +183,21 @@ export const TOOLS = {
     write: true,
     call: async (input, services) => ok({ ...(await services.organize.deleteProblems(input)) }),
   } satisfies Tool<ReturnType<typeof parseDeleteProblems>>,
+
+  move_problems: {
+    description:
+      "Move problems to the end of a Problem Set (any Collection), in the given order, optionally setting their batch (type). The user's handwriting, Snapshots and feedback move with them. Use it to reorganise sets, e.g. merge 'Week 8 · Practice' and 'Week 8 · Prediction' into one 'Week 8' set with batches 'Practice' and 'Prediction'; then delete the emptied sets.",
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
+    schema: moveProblemsInput,
+    parse: parseMoveProblems,
+    write: true,
+    call: async (input, services) => ok({ ...(await services.organize.moveProblems(input)) }),
+  } satisfies Tool<ReturnType<typeof parseMoveProblems>>,
 
   update_problem_set: {
     description: 'Rename a Problem Set.',
