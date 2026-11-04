@@ -7,7 +7,7 @@ These pages describe the current foundation and the intended product without tre
 | [Architecture](architecture.md)           | Final architecture baseline, module boundaries, data ownership, consistency rules and implementation status |
 | [Product specification](specification.md) | Required handwriting, navigation, submission and review behavior                                            |
 | [API contracts](api.md)                   | Browser routes, MCP tools, limits and errors                                                                |
-| [Authentication](auth-integration.md)     | Passkeys, OAuth, React account pages and security boundaries                                                |
+| [Authentication](auth-integration.md)     | Password sign-in, OAuth, React account pages and security boundaries                                        |
 | [Deployment](deployment.md)               | Build, provisioning, setup, recovery and upgrade procedure                                                  |
 | [Runtime measurements](performance.md)    | Cloudflare Free-plan CPU measurements, closed audit findings and remaining capacity decisions               |
 | [Development](development.md)             | Local checks, UI fixtures, documentation policy and remaining validation                                    |

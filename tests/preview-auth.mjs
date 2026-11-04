@@ -67,7 +67,7 @@ const server = createServer(async (request, response) => {
   response.setHeader('Content-Type', 'text/html');
   response.setHeader(
     'Content-Security-Policy',
-    "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'",
+    "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data: blob:; font-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'",
   );
   response.end(await readFile(resolve(publicRoot, 'index.html')));
 });

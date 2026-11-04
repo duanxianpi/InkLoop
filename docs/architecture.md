@@ -16,18 +16,19 @@ There is no built-in LLM, model API key, chat system, automatic grader, backgrou
 
 | Area                                                            | Status in this repository                                                        |
 | --------------------------------------------------------------- | -------------------------------------------------------------------------------- |
-| Passkey owner authentication, bootstrap/recovery, Web sessions  | Implemented; existing server logic retained                                      |
+| Owner password sign-in, setup/recovery keys, Web sessions       | Implemented; Passkeys were replaced by passwords in `0005_password.sql`          |
 | OAuth consent, scopes, epoch checks, grant listing/revocation   | Implemented; exercised in local integration tests                                |
 | React account pages                                             | Implemented in the same client-rendered React SPA as the product entry           |
 | Worker routing, assets, build/deploy scripts, auth migrations   | Implemented                                                                      |
 | Browser API and four MCP tool definitions                       | Wired to shared service contracts; input validation and body budgets implemented |
 | Product DTOs, domain errors, operational limits, Web API client | Implemented                                                                      |
-| Product database schema and services                            | Pending; all service methods throw `not_implemented`                             |
-| Product React UI and canvas adapter                             | Pending; `App` is an empty entry                                                 |
-| ChangeHub, change counter and long-poll services                | Interfaces only; not operational                                                 |
+| Product database schema and services                            | Implemented (`0004_product.sql`, `src/server/services/`); D1 integration tests   |
+| Product React UI and canvas adapter                             | Implemented; POC board ported to React components over a thin tldraw adapter     |
+| ChangeHub, change counter and long-poll services                | Implemented; WebSocket, catch-up and long-poll covered by local tests            |
+| Local drafts, serial save queue, conflict recovery              | Implemented (IndexedDB, `src/web/sync/`)                                         |
 | Export/restore, object collection, complete product acceptance  | Pending                                                                          |
 
-Local tests establish the foundation's behavior, not the correctness of future product persistence. The isolated Cloudflare authentication/CPU run is documented in [Runtime measurements](performance.md). Physical-device Passkey testing and production deployment/upgrade acceptance remain release checks.
+Local tests run the real Worker, D1, R2 and ChangeHub in Miniflare, including concurrent commits, idempotent retries and stale-epoch rollback. The isolated Cloudflare authentication/CPU run is documented in [Runtime measurements](performance.md). Physical-device Passkey testing and production deployment/upgrade acceptance remain release checks.
 
 ## 3. Runtime topology
 
@@ -39,7 +40,7 @@ flowchart TD
     Browser -->|/assets/*| Static[Cloudflare Static Assets: immutable public files]
     Agent[AI client: Remote MCP] --> Hono
     Hono --> Assets[Static HTML shell via ASSETS binding]
-    Hono --> Auth[Passkey and consent handlers]
+    Hono --> Auth[Password and consent handlers]
     Hono --> SDK[OAuth SDK endpoints]
     Hono --> Web[Authenticated product API router]
     SDK -->|authenticated /mcp| MCP[Hand-rolled MCP endpoint and tools]
@@ -57,27 +58,30 @@ D1 is authoritative for structured state and committed pointers. R2 holds object
 
 ## 4. Source boundaries
 
-| Path                          | Responsibility                                                                          |
-| ----------------------------- | --------------------------------------------------------------------------------------- |
-| `src/server/index.ts`         | Hono top-level route table and Worker entry                                             |
-| `src/server/middleware.ts`    | Request context, sessions, CSRF, rate limits and security headers                       |
-| `src/server/auth/`            | Passkey ceremonies, consent/grant handlers and OAuth SDK integration; no HTML rendering |
-| `src/server/http/`            | Shared bounded body readers and stable HTTP/MCP application error mapping               |
-| `src/shared/pages.ts`         | Page registry shared by Hono and React                                                  |
-| `src/server/routes/`          | Static SPA shell handler and mounted product API router                                 |
-| `src/server/mcp/`             | Stateless MCP endpoint, tool definitions, input validators, scope checks and dispatch   |
-| `src/server/services/`        | Shared product service interfaces; future business invariants                           |
-| `src/server/env.ts`, `hub.ts` | Bindings/request context and notification-only Durable Object interface                 |
-| `src/web/main.tsx`, `App.tsx` | Single browser entry and page selection                                                 |
-| `src/web/auth/`               | Browser-only React account pages and CSS                                                |
-| `src/web/api.ts`              | Typed product API client                                                                |
-| `src/shared/`                 | DTOs, consent API types, input schemas, errors and limits                               |
-| `src/tooling/`                | Build, provisioning/deployment and maintenance entry                                    |
-| `migrations/`                 | Ordered D1 migrations; `0001`–`0003` belong to auth                                     |
+| Path                          | Responsibility                                                                        |
+| ----------------------------- | ------------------------------------------------------------------------------------- |
+| `src/server/index.ts`         | Hono top-level route table and Worker entry                                           |
+| `src/server/middleware.ts`    | Request context, sessions, CSRF, rate limits and security headers                     |
+| `src/server/auth/`            | Password sign-in, consent/grant handlers and OAuth SDK integration; no HTML rendering |
+| `src/server/http/`            | Shared bounded body readers and stable HTTP/MCP application error mapping             |
+| `src/shared/pages.ts`         | Page registry shared by Hono and React                                                |
+| `src/server/routes/`          | Static SPA shell handler and mounted product API router                               |
+| `src/server/mcp/`             | Stateless MCP endpoint, tool definitions, input validators, scope checks and dispatch |
+| `src/server/services/`        | Shared product service interfaces; future business invariants                         |
+| `src/server/env.ts`, `hub.ts` | Bindings/request context and notification-only Durable Object interface               |
+| `src/web/main.tsx`, `App.tsx` | Single browser entry and page selection                                               |
+| `src/web/auth/`               | Browser-only React account pages and CSS                                              |
+| `src/web/api.ts`              | Typed product API client                                                              |
+| `src/web/board/`              | Product board: controller, React components ported from the POC, math rendering       |
+| `src/web/canvas/`             | Thin tldraw adapter: document load/capture, answer fingerprint, PNG export, gestures  |
+| `src/web/sync/`               | IndexedDB drafts, per-problem serial save queue, change feed                          |
+| `src/shared/`                 | DTOs, consent API types, input schemas, errors and limits                             |
+| `src/tooling/`                | Build, provisioning/deployment and maintenance entry                                  |
+| `migrations/`                 | Ordered D1 migrations; `0001`–`0003` belong to auth                                   |
 
 Services must not depend on HTTP requests, Hono contexts or MCP servers. Transport adapters must not implement competing versions of the save/submit state machine. Browser components never import database or server authentication modules. The Worker never imports React components.
 
-`src/web/canvas/assets.ts` already defines local drawing asset URLs. As product implementation grows, extend that directory with the thin tldraw adapter. Add `src/web/sync/` for local persistence/save queues and focused service/repository modules as needed. These directories are planned boundaries, not empty scaffolding that must be populated in advance. No generic repository framework or multi-package platform is required.
+The board's components keep the POC's markup, class names and stylesheet; the POC constrains the interface, not the code behind it. One tldraw editor shows one Problem's document at a time and swaps documents on navigation. The controller (`src/web/board/controller.ts`) owns state and actions; components only render it. While a pen stroke is in progress the board store holds updates and applies them when the pen lifts. Services are split per area (`problems`, `canvas`, `submissions`, `feedback`, `preferences`, `changes`) with shared D1 helpers in `store.ts`; there is no generic repository framework.
 
 ## 5. Authentication and React SPA
 
@@ -85,7 +89,7 @@ Hono middleware resolves the owner and checks same-origin mutations before priva
 
 Account pages and the product entry share one client-rendered React application. Hono serves the same static HTML shell for known page URLs from the shared page registry. Cloudflare serves public hashed JS/CSS under `/assets/*` directly. Private data comes from protected APIs. There is no SSR, hydration, dedicated auth bundle or inline script injection.
 
-Passkey interactions call browser APIs, then send results to backend verification. The consent page fetches validated OAuth context from `POST /auth/consent`, submits its decision to `POST /authorize`, and follows the server-returned, SDK-validated redirect. Consent handles, cookies, scopes, Origin and session checks remain server-enforced. React escapes external display text; no private data is embedded in the HTML shell.
+The sign-in pages stretch the password in the browser (PBKDF2-SHA256) and send only the stretched value; see [Authentication](auth-integration.md#owner-lifecycle). The consent page fetches validated OAuth context from `POST /auth/consent`, submits its decision to `POST /authorize`, and follows the server-returned, SDK-validated redirect. Consent handles, cookies, scopes, Origin and session checks remain server-enforced. React escapes external display text; no private data is embedded in the HTML shell.
 
 OAuth integration receives an authenticated MCP handler from the root router. It imports no product services or MCP tool implementation. The request's auth-state snapshot is reused for token/grant validation and metadata; revocation still requires its own authoritative D1 lookup. There is no cross-request authorization cache. Consent submission receives the session already checked by middleware, and `mcp:read` is mandatory in both UI and server validation. `/setup` is rate limited and skips bootstrap initialization writes once setup is complete.
 
@@ -95,17 +99,17 @@ Auth source is a maintained InkLoop adaptation of the upstream template. Updates
 
 ## 6. Data ownership
 
-| State                                                                     | Authority / intended storage                                           |
-| ------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
-| Owner, sessions, Passkeys, canonical origin, auth epoch, revocation index | D1; implemented                                                        |
-| OAuth grants/tokens and SDK metadata                                      | OAuth SDK KV; implemented                                              |
-| Collections, sets, problems, Canvas revision pointers and fingerprints    | D1; pending                                                            |
-| Versioned Canvas documents (stored verbatim) and Snapshot images (base64) | Private R2; pending                                                    |
-| Snapshot sequence/latest pointer, feedback and idempotency records        | D1; pending                                                            |
-| Server change counter                                                     | D1, advanced with visible product mutations; pending                   |
-| Unacknowledged local strokes and conflict recovery copies                 | Browser IndexedDB; pending                                             |
-| Per-problem camera, active tool/color and current selection               | Browser session/local recovery state; excluded from answer fingerprint |
-| Persisted user preferences                                                | Preferences service; storage implementation pending                    |
+| State                                                                              | Authority / intended storage                                           |
+| ---------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| Owner, sessions, password verifier, canonical origin, auth epoch, revocation index | D1                                                                     |
+| OAuth grants/tokens and SDK metadata                                               | OAuth SDK KV; implemented                                              |
+| Collections, sets, problems, Canvas revision pointers and fingerprints             | D1                                                                     |
+| Versioned Canvas documents (stored verbatim) and Snapshot images (base64)          | Private R2; the current and previous Canvas revision are kept          |
+| Snapshot sequence/latest pointer, feedback and idempotency records                 | D1                                                                     |
+| Server change counter                                                              | D1, advanced with visible product mutations                            |
+| Unacknowledged local strokes and conflict recovery copies                          | Browser IndexedDB                                                      |
+| Per-problem camera, active tool/color and current selection                        | Browser session/local recovery state; excluded from answer fingerprint |
+| Persisted user preferences                                                         | D1 `preferences`, cached in browser local storage                      |
 
 Snapshots carry stable IDs, per-problem monotonic sequence, source revision and creation time. Feedback explicitly references a Snapshot and must also belong to that Snapshot's Problem. Database constraints must prevent cross-problem references and duplicate sequence numbers.
 
@@ -113,7 +117,7 @@ The Canvas document is a tldraw store snapshot: records plus the schema versions
 
 ## 7. Draft save and submission consistency
 
-The following are required implementation invariants, not claims about the current service stubs.
+The services implement these invariants; `tests/product.test.mjs` exercises them against local D1 and R2.
 
 ### Draft save
 
@@ -197,7 +201,7 @@ Why base64 in R2:
 - D1 is unsuitable. A row, string or BLOB is limited to 2 MB, below the 8 MiB Snapshot limit, and a BLOB crosses the D1 binding as a JavaScript array with one number per byte, serialized through JSON. Per-call binding overhead is already the largest warm CPU cost; image-sized results would dominate it.
 - One stored representation avoids keeping a PNG and a base64 copy consistent. The cost is 4/3 storage and upload size.
 
-Write path: the browser encodes the exported PNG (browser CPU costs nothing against the Worker budget) and uploads the text with a `Content-Length`. The Worker checks the length against the limit, decodes only the first 32 characters (24 bytes: PNG signature and IHDR width/height) to validate the header and dimensions, and pipes the remaining stream into R2 through a fixed-length stream. It does not decode, hash or rescan the body. The commit then follows §7 unchanged. Full decoding would cost CPU proportional to size; a body that is malformed after a valid header can only be the single owner's own submission.
+Write path: the browser encodes the exported PNG (browser CPU costs nothing against the Worker budget) and uploads the text with a `Content-Length`. The Worker checks the length against the limit, decodes only the first 32 characters (24 bytes: PNG signature and IHDR width/height) to validate the header and dimensions, and pipes the remaining stream into R2 through a fixed-length stream. While streaming it checks that every byte is base64 (alphabet, then at most two trailing `=`; the total length is a multiple of 4), because `get_submission` places the stored text verbatim inside a JSON string. An invalid byte aborts the upload, so no object is stored and nothing is committed. It does not decode or hash the image: the check is one table lookup per byte, a small CPU cost next to decoding. The commit then follows §7 unchanged.
 
 Read paths:
 
@@ -214,7 +218,7 @@ The payload is only `{ type: "changed", seq }`. Pages retrieve actual data throu
 
 The future browser connection flow must establish its subscription and then read the current counter, reconcile after reconnect, and periodically recheck even while connected so a missed post-commit notification cannot leave an indefinitely stale UI. Remote updates never switch the active problem, change the camera or interrupt a pen stroke.
 
-The hub must enforce auth-epoch changes and define bounded socket lifetime/revalidation; an initial handshake does not authorize an indefinite connection. No private content is sent over it. The current hub is a stub, so these guarantees still require implementation and tests.
+The hub must enforce auth-epoch changes and define bounded socket lifetime/revalidation; an initial handshake does not authorize an indefinite connection. No private content is sent over it. The hub tags each socket with its auth epoch and a one-hour lifetime: a notification from a newer epoch, or an alarm at expiry, closes it and the page reconnects through the authenticated route.
 
 ## 10. Transport contracts and budgets
 
@@ -224,7 +228,7 @@ MCP has an 8 MiB body budget; canvas JSON, PNG and preferences have 4 MiB, 8 MiB
 
 ## 11. Build, formatting, deployment and documentation
 
-Vite emits the shared SPA HTML and ordinary hashed JS/CSS assets. The build also copies the pinned tldraw fonts, icons and translations to versioned local asset URLs, verified against the engine version. The future canvas must pass `canvasAssetUrls` to tldraw; complete canvas/CSP validation remains pending. Account styles are scoped to `.auth-page`. A separate Worker bundle is generated for integration tests. Node.js 22.12+ is required. Deployment always rebuilds successfully before any migration, provisioning or publishing, and uses the same source and ordered migrations, provisioning missing resources through a maintenance-only Worker before publishing the application.
+Vite emits the shared SPA HTML and ordinary hashed JS/CSS assets. The build also copies the pinned tldraw fonts, icons and translations to versioned local asset URLs, verified against the engine version. The canvas passes `canvasAssetUrls` to tldraw. Fonts, MathJax and all other assets are served from `/assets`; Vite never inlines assets as `data:` URLs. The page CSP keeps `script-src 'self'` and allows inline styles (`style-src 'self' 'unsafe-inline'`), because tldraw's license watermark and image export and MathJax's SVG output inject `<style>` elements. Account styles are scoped to `.auth-page`. A separate Worker bundle is generated for integration tests. Node.js 22.12+ is required. Deployment always rebuilds successfully before any migration, provisioning or publishing, and uses the same source and ordered migrations, provisioning missing resources through a maintenance-only Worker before publishing the application.
 
 `docs/` is public and tracked. `internal/docs/` contains local planning and historical evidence and is ignored, along with experiments, prototypes and private deployment data. Public instructions must work without any ignored file or neighboring template checkout. Old Access/cf setup guides and the template source-copy workflow are retired.
 
@@ -232,11 +236,9 @@ Prettier formats maintained source, tests, configuration and public Markdown. `n
 
 See [Deployment](deployment.md) and [Development](development.md) for commands and validation boundaries.
 
-## 12. Next implementation sequence
+## 12. Remaining release work
 
-1. Add product migrations, uniqueness/ownership constraints and service write guards; prove D1 commit behavior under conflicts and failures.
-2. Implement the thin canvas adapter and IndexedDB-backed serial save queue using the established interaction requirements.
-3. Implement idempotent Snapshot commit/resume and authenticated image reads.
-4. Implement the four MCP services and append-only feedback, then complete a real client round trip.
-5. Implement ChangeHub delivery/catch-up and remaining product UI without disturbing active handwriting.
-6. Complete device, deployment, backup/restore and failure-recovery acceptance before describing the product as usable.
+1. Physical iPad acceptance (§21 of the specification): Pencil latency, palm rejection, gestures, toolbar placement, touch-target size at the POC's 75% chrome scale, and the time PBKDF2 takes at sign-in.
+2. A deployed run with a real AI client: OAuth onboarding, create → write → Mark ready → `get_submission` → `append_feedback`.
+3. Data export/restore and collection of unreferenced R2 objects (failed uploads whose outcome was unknown) with a retention window.
+4. Cloudflare CPU measurements for the product services, which the earlier runs measured only as stubs ([Runtime measurements](performance.md)).

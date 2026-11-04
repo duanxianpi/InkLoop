@@ -56,7 +56,7 @@ export async function boundedText(request: Request, limit: number): Promise<stri
   }
 }
 
-/** Auth payloads must be objects before handlers inspect ceremony-specific fields. */
+/** Auth payloads must be objects before handlers inspect their fields. */
 export async function boundedJsonObject(
   request: Request,
   limit: number,

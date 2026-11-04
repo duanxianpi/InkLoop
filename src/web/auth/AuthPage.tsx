@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
-import type { AuthPageData, ConsentData } from '../../shared/auth';
+import type { AuthPageData, ConsentData, PasswordParams } from '../../shared/auth';
+import { newCredential, stretch } from './password';
 
 async function post<T = unknown>(path: string, value: unknown) {
   const response = await fetch(path, {
@@ -24,25 +25,76 @@ function Layout({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
-function PasskeyPage({ data }: { data: Extract<AuthPageData, { kind: 'passkey' }> }) {
+function returnToDestination() {
+  const target = new URLSearchParams(location.search).get('returnTo');
+  let destination = new URL('/app', location.origin);
+  try {
+    destination = new URL(target || '/app', location.origin);
+  } catch {
+    /* Use the default. */
+  }
+  return destination.origin === location.origin
+    ? destination.pathname + destination.search + destination.hash
+    : '/app';
+}
+
+async function params() {
+  const response = await fetch('/auth/password');
+  const data = (await response.json()) as PasswordParams & { error?: string; message?: string };
+  if (!response.ok) throw new Error(data.message || data.error || 'Request failed');
+  return data;
+}
+
+function PasswordField({
+  label,
+  value,
+  onChange,
+  autoComplete,
+  disabled,
+}: {
+  label: string;
+  value: string;
+  onChange(value: string): void;
+  autoComplete: 'current-password' | 'new-password';
+  disabled: boolean;
+}) {
+  return (
+    <label>
+      {label}
+      <input
+        type="password"
+        autoComplete={autoComplete}
+        required
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        disabled={disabled}
+      />
+    </label>
+  );
+}
+
+function PasswordPage({ data }: { data: Extract<AuthPageData, { kind: 'password' }> }) {
   const [status, setStatus] = useState('');
   const [busy, setBusy] = useState(false);
   const [key, setKey] = useState('');
+  const [current, setCurrent] = useState('');
+  const [password, setPassword] = useState('');
+  const [repeat, setRepeat] = useState('');
   const [confirmed, setConfirmed] = useState(false);
   const { purpose, initialized, origin } = data;
-  if (purpose === 'bootstrap' && initialized)
+  if (purpose === 'setup' && initialized)
     return (
       <Layout title="Already set up">
         <p>This deployment already has an owner.</p>
         <a href="/login">Sign in</a>
       </Layout>
     );
-  const registration = purpose !== 'login';
-  const needsKey = purpose === 'bootstrap' || purpose === 'recovery';
+  const needsKey = purpose === 'setup' || purpose === 'recovery';
+  const choosing = purpose !== 'login';
   const title = {
-    bootstrap: 'Set up your whiteboard',
-    recovery: 'Recover ownership',
-    add: 'Add a Passkey',
+    setup: 'Set up your whiteboard',
+    recovery: 'Reset your password',
+    change: 'Change password',
     login: 'Sign in',
   }[purpose];
 
@@ -52,57 +104,33 @@ function PasskeyPage({ data }: { data: Extract<AuthPageData, { kind: 'passkey' }
     setBusy(true);
     setStatus('');
     try {
-      if (purpose === 'bootstrap' && !confirmed)
+      if (purpose === 'setup' && !confirmed)
         throw new Error('Confirm your deployment address first.');
-      if (
-        typeof PublicKeyCredential === 'undefined' ||
-        !navigator.credentials ||
-        (registration
-          ? !PublicKeyCredential.parseCreationOptionsFromJSON
-          : !PublicKeyCredential.parseRequestOptionsFromJSON)
-      ) {
-        throw new Error(
-          'This browser does not support the required Passkey APIs. Use an up-to-date browser.',
-        );
+      if (choosing && password !== repeat) throw new Error('The two passwords do not match.');
+      if (purpose === 'login') {
+        await post('/auth/login', { derived: await stretch(password, await params()) });
+      } else if (purpose === 'change') {
+        await post('/auth/password', {
+          current: await stretch(current, await params()),
+          password: await newCredential(password),
+        });
+        setCurrent('');
+        setPassword('');
+        setRepeat('');
+        setStatus('Password changed. Other devices were signed out.');
+        return;
+      } else {
+        await post(purpose === 'setup' ? '/auth/setup' : '/auth/recover', {
+          key,
+          canonicalOrigin: origin,
+          password: await newCredential(password),
+        });
       }
-      const prepared = await post<{
-        id: string;
-        publicKey: PublicKeyCredentialCreationOptionsJSON | PublicKeyCredentialRequestOptionsJSON;
-      }>(`/auth/${purpose}/options`, { key: needsKey ? key : undefined, canonicalOrigin: origin });
-      const credential = (
-        registration
-          ? await navigator.credentials.create({
-              publicKey: PublicKeyCredential.parseCreationOptionsFromJSON(
-                prepared.publicKey as PublicKeyCredentialCreationOptionsJSON,
-              ),
-            })
-          : await navigator.credentials.get({
-              publicKey: PublicKeyCredential.parseRequestOptionsFromJSON(
-                prepared.publicKey as PublicKeyCredentialRequestOptionsJSON,
-              ),
-            })
-      ) as PublicKeyCredential | null;
-      if (!credential) throw new Error('No Passkey was selected. Please try again.');
-      await post(`/auth/${purpose}/finish`, {
-        id: prepared.id,
-        key: needsKey ? key : undefined,
-        response: credential.toJSON(),
-      });
       setKey('');
-      const target = new URLSearchParams(location.search).get('returnTo');
-      let destination = new URL('/app', location.origin);
-      try {
-        destination = new URL(target || '/app', location.origin);
-      } catch {
-        /* Use the default. */
-      }
-      location.assign(
-        destination.origin === location.origin
-          ? destination.pathname + destination.search + destination.hash
-          : '/app',
-      );
+      setPassword('');
+      location.assign(returnToDestination());
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : 'Sign-in failed. Please try again.');
+      setStatus(error instanceof Error ? error.message : 'Something went wrong. Please try again.');
     } finally {
       setBusy(false);
     }
@@ -114,19 +142,22 @@ function PasskeyPage({ data }: { data: Extract<AuthPageData, { kind: 'passkey' }
         <p>
           In the Cloudflare Dashboard, open this Worker’s <strong>DB</strong> binding, then the{' '}
           <strong>admin_keys</strong> table. Copy <code>secret_display</code> for{' '}
-          <code>{purpose}</code>. It is never shown by this website.
+          <code>{purpose === 'setup' ? 'bootstrap' : 'recovery'}</code>. It is never shown by this
+          website.
         </p>
       )}
       {purpose === 'recovery' && (
         <p>
-          After a successful replacement, previous Passkeys, sessions and MCP authorizations stop
-          working. The replacement recovery key will be available only in D1.
+          Resetting the password signs out every device and disconnects every AI app. A new recovery
+          key will be available only in D1.
         </p>
       )}
       <form onSubmit={submit} aria-busy={busy}>
+        {/* Lets password managers save the password for this deployment. */}
+        <input type="text" name="username" autoComplete="username" value="owner" readOnly hidden />
         {needsKey && (
           <label>
-            Owner {purpose === 'bootstrap' ? 'claim' : 'recovery'} key
+            Owner {purpose === 'setup' ? 'claim' : 'recovery'} key
             <input
               type="password"
               autoComplete="off"
@@ -137,7 +168,39 @@ function PasskeyPage({ data }: { data: Extract<AuthPageData, { kind: 'passkey' }
             />
           </label>
         )}
-        {purpose === 'bootstrap' && (
+        {purpose === 'change' && (
+          <PasswordField
+            label="Current password"
+            value={current}
+            onChange={setCurrent}
+            autoComplete="current-password"
+            disabled={busy}
+          />
+        )}
+        <PasswordField
+          label={choosing ? 'New password' : 'Password'}
+          value={password}
+          onChange={setPassword}
+          autoComplete={choosing ? 'new-password' : 'current-password'}
+          disabled={busy}
+        />
+        {choosing && (
+          <>
+            <PasswordField
+              label="Repeat the new password"
+              value={repeat}
+              onChange={setRepeat}
+              autoComplete="new-password"
+              disabled={busy}
+            />
+            <p className="hint">
+              Any password works. A longer one, such as a few unrelated words, is much harder to
+              guess.
+              {password && password.length < 8 && ' This one is short.'}
+            </p>
+          </>
+        )}
+        {purpose === 'setup' && (
           <label className="check">
             <input
               type="checkbox"
@@ -146,20 +209,40 @@ function PasskeyPage({ data }: { data: Extract<AuthPageData, { kind: 'passkey' }
               onChange={(e) => setConfirmed(e.target.checked)}
               disabled={busy}
             />{' '}
-            Use <code>{origin}</code> as this deployment’s permanent Passkey and OAuth address.
+            Use <code>{origin}</code> as this deployment’s permanent sign-in and OAuth address.
           </label>
         )}
         <button disabled={busy}>
-          {busy ? 'Waiting for Passkey…' : registration ? 'Register Passkey' : 'Use Passkey'}
+          {busy
+            ? purpose === 'login'
+              ? 'Signing in…'
+              : 'Saving…'
+            : {
+                setup: 'Set up',
+                login: 'Sign in',
+                recovery: 'Reset password',
+                change: 'Change password',
+              }[purpose]}
         </button>
       </form>
       <p role="status" aria-live="polite">
         {status}
       </p>
       <p>
-        <a href="/login">Sign in</a> · <a href="/recover">Recovery instructions</a>
+        {purpose === 'change' ? (
+          <a href="/app">Back to whiteboard</a>
+        ) : (
+          <>
+            {purpose !== 'login' && (
+              <>
+                <a href="/login">Sign in</a> ·{' '}
+              </>
+            )}
+            {purpose !== 'recovery' && <a href="/recover">Forgot your password?</a>}
+          </>
+        )}
       </p>
-      <noscript>Enable JavaScript to use Passkeys.</noscript>
+      <noscript>Enable JavaScript to sign in.</noscript>
     </Layout>
   );
 }
@@ -324,7 +407,7 @@ function Consent({ data }: { data: ConsentData }) {
 }
 
 export function AuthPage({ data }: { data: AuthPageData }) {
-  if (data.kind === 'passkey') return <PasskeyPage data={data} />;
+  if (data.kind === 'password') return <PasswordPage data={data} />;
   if (data.kind === 'connections') return <Connections />;
   return <Consent data={data} />;
 }

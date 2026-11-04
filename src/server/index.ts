@@ -10,7 +10,14 @@ import { LIMITS } from '../shared/limits';
 import { PAGES } from '../shared/pages';
 import { handleMcp } from './mcp/handler';
 import { createServices } from './services';
-import { ensureBootstrap, finish, options } from './auth/owner';
+import {
+  changePassword,
+  ensureBootstrap,
+  login,
+  passwordParams,
+  recover,
+  setup,
+} from './auth/owner';
 import { listGrants, prepareConsent, revokeGrant, submitConsent } from './auth/handlers';
 import { handleOAuth, withOAuth } from './auth/oauth';
 import {
@@ -46,7 +53,7 @@ app.use('/setup', authRateLimit);
 app.use('/authorize', authRateLimit, requireSetup);
 for (const page of PAGES) {
   if (page.access === 'session') app.get(page.path, requirePageSession, serveSpa);
-  else if (page.purpose === 'bootstrap')
+  else if (page.purpose === 'setup')
     app.get(page.path, async (c) => {
       if (!c.get('authState').initialized_at) await ensureBootstrap(c.env);
       return serveSpa(c);
@@ -54,25 +61,19 @@ for (const page of PAGES) {
   else app.get(page.path, serveSpa);
 }
 
-// Public setup state and the Passkey ceremonies. Ceremony handlers perform their own proof checks.
+// Public setup state and password sign-in. Setup and recovery prove the D1 claim/recovery key.
 app.get('/api/status', (c) => c.json({ initialized: !!c.get('authState').initialized_at }));
 app.use('/auth/*', authRateLimit, sameOriginMutation);
-app.post('/auth/:purpose/options', (c) => {
-  const purpose = c.req.param('purpose');
-  assert(['bootstrap', 'recovery', 'login', 'add'].includes(purpose), 404, 'Not found');
-  return options(c.req.raw, c.env, purpose, c.get('authState'));
+app.get('/auth/password', (c) => passwordParams(c.env, c.get('authState')));
+app.post('/auth/setup', (c) => setup(c.req.raw, c.env, c.get('authState')));
+app.post('/auth/login', (c) => login(c.req.raw, c.env, c.get('authState')));
+app.post('/auth/recover', (c) => {
+  const state = c.get('authState');
+  return recover(c.req.raw, state.canonical_origin ? withOAuth(c.env, state) : c.env, state);
 });
-app.post('/auth/:purpose/finish', (c) => {
-  const purpose = c.req.param('purpose');
-  assert(['bootstrap', 'recovery', 'login', 'add'].includes(purpose), 404, 'Not found');
-  const origin = c.get('authState').canonical_origin;
-  return finish(
-    c.req.raw,
-    origin && purpose === 'recovery' ? withOAuth(c.env, c.get('authState')) : c.env,
-    purpose,
-    c.get('authState'),
-  );
-});
+app.post('/auth/password', requireSession, (c) =>
+  changePassword(c.req.raw, c.env, c.get('authState'), c.get('user')),
+);
 app.post('/auth/consent', requireSetup, requireSession, (c) => {
   const origin = c.get('authState').canonical_origin!;
   return prepareConsent(c.req.raw, withOAuth(c.env, c.get('authState')), origin);

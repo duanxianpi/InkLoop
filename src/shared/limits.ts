@@ -16,6 +16,9 @@ export const LIMITS = {
   // Byte limits apply to the complete HTTP body, including JSON envelopes.
   canvasDocumentBytes: 4 * 1024 * 1024,
   snapshotImageBytes: 8 * 1024 * 1024,
+  /** Base64 text of the largest permitted PNG. */
+  snapshotImageBase64: Math.ceil((8 * 1024 * 1024) / 3) * 4,
+  fingerprintLength: 100,
   preferencesBytes: 16 * 1024,
   longPollSeconds: 6,
   longPollIntervalMs: 2000,

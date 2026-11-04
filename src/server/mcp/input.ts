@@ -125,7 +125,10 @@ export function parseAppendFeedback(raw: unknown): AppendFeedbackInput {
         const path = `callouts.${index}`;
         const callout = object(item, path);
         return {
-          label: string(callout.label, path + '.label', 1, 200),
+          kind: oneOf(callout.kind, path + '.kind', ['correct', 'fix', 'incorrect'] as const),
+          math: optional(callout.math, (math) =>
+            string(math, path + '.math', 1, LIMITS.calloutLength),
+          ),
           text: string(callout.text, path + '.text', 1, LIMITS.calloutLength),
         };
       }),

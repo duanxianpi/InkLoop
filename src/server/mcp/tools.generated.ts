@@ -190,19 +190,30 @@ export const TOOL_LIST = [
           "items": {
             "type": "object",
             "properties": {
-              "label": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "correct",
+                  "fix",
+                  "incorrect"
+                ],
+                "description": "correct: a step that is right; fix: a step that is incomplete or needs a change; incorrect: a wrong step."
+              },
+              "math": {
+                "description": "The step being discussed, quoted as display LaTeX without $ delimiters.",
                 "type": "string",
                 "minLength": 1,
-                "maxLength": 200
+                "maxLength": 4000
               },
               "text": {
                 "type": "string",
                 "minLength": 1,
-                "maxLength": 4000
+                "maxLength": 4000,
+                "description": "Explanation; Markdown with $…$ math. Raw HTML is not rendered."
               }
             },
             "required": [
-              "label",
+              "kind",
               "text"
             ]
           }

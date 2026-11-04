@@ -4,7 +4,7 @@ import { HttpError } from '../http/errors';
 import type { Services } from '../services';
 import { LIMITS } from '../../shared/limits';
 import { TOOL_LIST } from './tools.generated';
-import { callTool, isToolName } from './tools';
+import { callTool, IMAGE_DATA, isToolName, type ToolResult } from './tools';
 
 // Hand-rolled MCP endpoint: stateless Streamable HTTP, protocol version 2025-11-25.
 //
@@ -37,6 +37,43 @@ const reply = (body: unknown, status = 200, headers?: Record<string, string>) =>
 const result = (id: Id, value: unknown) => reply({ jsonrpc: '2.0', id, result: value });
 const error = (id: Id | null, code: number, message: string, status = 200) =>
   reply({ jsonrpc: '2.0', id, error: { code, message } }, status);
+
+/**
+ * A tool result whose image is stored as base64 text: the JSON is split at the image placeholder
+ * and the object is streamed between the two halves, so the Worker never buffers or encodes it.
+ * Base64 needs no JSON escaping. JSON.stringify writes the NUL characters of the placeholder as
+ * \u0000 escapes, which no other serialized string can produce unescaped.
+ */
+function streamedResult(id: Id, { image, ...value }: ToolResult & { image: object }) {
+  const marker = JSON.stringify(IMAGE_DATA).slice(1, -1);
+  const [prefix, suffix, extra] = JSON.stringify({ jsonrpc: '2.0', id, result: value }).split(
+    marker,
+  );
+  if (suffix === undefined || extra !== undefined) throw new Error('image placeholder');
+  const encoder = new TextEncoder();
+  const head = encoder.encode(prefix);
+  const tail = encoder.encode(suffix);
+  const { readable, writable } = new FixedLengthStream(
+    head.byteLength + image.length + tail.byteLength,
+  );
+  void (async () => {
+    const writer = writable.getWriter();
+    try {
+      await writer.write(head);
+      const reader = image.body.getReader();
+      for (;;) {
+        const { done, value: chunk } = await reader.read();
+        if (done) break;
+        await writer.write(chunk);
+      }
+      await writer.write(tail);
+      await writer.close();
+    } catch (cause) {
+      await writer.abort(cause).catch(() => undefined);
+    }
+  })();
+  return new Response(readable, { headers: { 'Content-Type': 'application/json' } });
+}
 
 const isObject = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -120,7 +157,10 @@ export async function handleMcp(
         if (!isToolName(params.name))
           return error(id, INVALID_PARAMS, 'Unknown tool: ' + String(params.name));
         const args = params.arguments === undefined ? {} : params.arguments;
-        return result(id, await callTool(params.name, args, owner, services));
+        const value = await callTool(params.name, args, owner, services);
+        return value.image
+          ? streamedResult(id, value as ToolResult & { image: object })
+          : result(id, value);
       }
       default:
         return error(id, METHOD_NOT_FOUND, 'Method not found');

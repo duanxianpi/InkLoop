@@ -66,9 +66,22 @@ export type ListProblemsInput = z.infer<typeof listProblemsInput>;
 
 export const getSubmissionInput = z.object({ problem_id: id });
 
+export const calloutKind = z.enum(['correct', 'fix', 'incorrect']);
 export const callout = z.object({
-  label: z.string().min(1).max(200),
-  text: z.string().min(1).max(LIMITS.calloutLength),
+  kind: calloutKind.describe(
+    'correct: a step that is right; fix: a step that is incomplete or needs a change; incorrect: a wrong step.',
+  ),
+  math: z
+    .string()
+    .min(1)
+    .max(LIMITS.calloutLength)
+    .optional()
+    .describe('The step being discussed, quoted as display LaTeX without $ delimiters.'),
+  text: z
+    .string()
+    .min(1)
+    .max(LIMITS.calloutLength)
+    .describe('Explanation; Markdown with $…$ math. Raw HTML is not rendered.'),
 });
 export const appendFeedbackInput = z.object({
   problem_id: id,
@@ -84,17 +97,14 @@ export const appendFeedbackInput = z.object({
 });
 export type AppendFeedbackInput = z.infer<typeof appendFeedbackInput>;
 
-export const canvasDocument = z.object({
-  store: z.record(z.string(), z.looseObject({ id: z.string(), typeName: z.string() })),
-  schema: z.unknown(),
+// Canvas saves carry the document as the body; these query parameters are all the Worker reads.
+export const saveCanvasParams = z.object({
+  base_revision: z.coerce.number().int().min(0),
+  edit_epoch: z.coerce.number().int().min(0),
+  fingerprint: z.string().min(1).max(LIMITS.fingerprintLength),
+  has_content: z.enum(['0', '1']).transform((value) => value === '1'),
 });
-
-export const saveCanvasInput = z.object({
-  base_revision: z.number().int().min(0),
-  edit_epoch: z.number().int().min(0),
-  document: canvasDocument,
-});
-export type SaveCanvasInput = z.infer<typeof saveCanvasInput>;
+export type SaveCanvasParams = z.infer<typeof saveCanvasParams>;
 
 export const commitParams = z.object({
   revision: z.coerce.number().int().min(0),

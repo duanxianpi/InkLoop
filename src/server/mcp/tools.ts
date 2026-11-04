@@ -24,7 +24,11 @@ export interface ToolResult {
   content: Content[];
   structuredContent?: Record<string, unknown>;
   isError?: true;
+  /** Base64 text streamed by the endpoint in place of the image block whose data is IMAGE_DATA. */
+  image?: { body: ReadableStream<Uint8Array>; length: number };
 }
+/** Placeholder `data` of a streamed image block; the endpoint replaces it while responding. */
+export const IMAGE_DATA = '\u0000image\u0000';
 
 interface Tool<Input> {
   description: string;
@@ -83,8 +87,9 @@ export const TOOLS = {
       if (submission.status === 'not_ready') return ok({ ...submission });
       const { image, ...metadata } = submission;
       return {
-        content: [text(metadata), { type: 'image', mimeType: image.mimeType, data: image.data }],
+        content: [text(metadata), { type: 'image', mimeType: image.mimeType, data: IMAGE_DATA }],
         structuredContent: metadata,
+        image: { body: image.body, length: image.length },
       };
     },
   } satisfies Tool<ReturnType<typeof parseGetSubmission>>,

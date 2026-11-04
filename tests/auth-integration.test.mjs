@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { readFile } from 'node:fs/promises';
-import { createHash, randomBytes } from 'node:crypto';
+import { createHash, pbkdf2Sync, randomBytes } from 'node:crypto';
+import { applyMigrations } from './migrations.mjs';
 const require = createRequire(import.meta.url);
 const { unstable_readConfig } = require('wrangler');
 const { Miniflare, convertV4MiniflareOptions } = require(
@@ -47,12 +48,7 @@ test('Hono SPA routing, direct static assets, owner sessions and OAuth lifecycle
     assert.equal(publicAsset.headers.get('cache-control'), 'public, max-age=31536000, immutable');
     assert.equal(publicAsset.headers.get('x-content-type-options'), 'nosniff');
     const db = await mf.getD1Database('DB');
-    for (const file of [
-      '0001_auth.sql',
-      '0002_probe_and_revocation.sql',
-      '0003_connected_apps.sql',
-    ])
-      await db.exec(await readFile(new URL('../migrations/' + file, import.meta.url), 'utf8'));
+    await applyMigrations(db);
     const origin = 'https://whiteboard.example';
     const setup = await mf.dispatchFetch(origin + '/setup');
     assert.equal(setup.status, 200, await setup.clone().text());
@@ -67,7 +63,7 @@ test('Hono SPA routing, direct static assets, owner sessions and OAuth lifecycle
       .first();
     assert.ok(bootstrap.secret_display);
     assert.ok(!setupHtml.includes(bootstrap.secret_display));
-    for (const path of ['/auth/bootstrap/options', '/auth/bootstrap/finish']) {
+    for (const path of ['/auth/setup', '/auth/login', '/auth/recover']) {
       for (const value of [null, [], 'text', 7, true]) {
         const invalid = await mf.dispatchFetch(origin + path, {
           method: 'POST',
@@ -78,23 +74,28 @@ test('Hono SPA routing, direct static assets, owner sessions and OAuth lifecycle
         assert.equal((await invalid.json()).error, 'invalid_request');
       }
     }
-    const ceremony = await mf.dispatchFetch(origin + '/auth/bootstrap/options', {
+    // Real setup: claim key, confirmed origin and a browser-stretched password.
+    const salt = randomBytes(16).toString('base64url');
+    const derived = pbkdf2Sync(
+      'correct horse',
+      Buffer.from(salt, 'base64url'),
+      600000,
+      32,
+      'sha256',
+    ).toString('base64url');
+    const ownerSetup = await mf.dispatchFetch(origin + '/auth/setup', {
       method: 'POST',
       headers: { Origin: origin, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ key: bootstrap.secret_display, canonicalOrigin: origin }),
+      body: JSON.stringify({
+        key: bootstrap.secret_display,
+        canonicalOrigin: origin,
+        password: { salt, iterations: 600000, derived },
+      }),
     });
-    assert.equal(ceremony.status, 200);
-    const preparedCeremony = await ceremony.json();
-    assert.ok(preparedCeremony.id);
-    assert.ok(preparedCeremony.publicKey.challenge);
-    assert.equal(preparedCeremony.publicKey.rp.id, 'whiteboard.example');
-    await db.prepare('INSERT INTO owner VALUES(1,unixepoch())').run();
-    await db
-      .prepare(
-        'UPDATE auth_state SET initialized_at=unixepoch(),canonical_origin=?,rp_id=?,auth_epoch=3',
-      )
-      .bind(origin, 'whiteboard.example')
-      .run();
+    assert.equal(ownerSetup.status, 200, await ownerSetup.clone().text());
+    assert.match(ownerSetup.headers.get('set-cookie'), /^__Host-owner=/);
+    await db.prepare('UPDATE auth_state SET auth_epoch=3').run();
+    await db.prepare('DELETE FROM web_sessions').run();
     const token = randomBytes(32).toString('base64url');
     await db
       .prepare('INSERT INTO web_sessions VALUES(?,1,3,unixepoch()+3600,unixepoch())')
@@ -119,22 +120,17 @@ test('Hono SPA routing, direct static assets, owner sessions and OAuth lifecycle
     assert.equal(await canvas.text(), html.toString());
     assert.equal(canvas.headers.get('cache-control'), 'no-store');
     assert.equal((await (await request('/api/me', { headers: auth })).json()).ownerId, 1);
-    assert.equal(
-      (await (await request('/api/problems', { headers: auth })).json()).error,
-      'not_implemented',
-      'product routes are wired to the service contract',
+    assert.deepEqual(
+      await (await request('/api/problems', { headers: auth })).json(),
+      { problems: [], next_cursor: null },
+      'product routes are wired to the services',
     );
     assert.equal((await request('/mcp', { method: 'POST', headers: auth })).status, 401);
     assert.equal(
       (await request('/app', { headers: { authorization: 'Bearer ' + token } })).status,
       302,
     );
-    for (const path of [
-      '/login',
-      '/recover',
-      '/settings/passkeys/add',
-      '/settings/connected-apps',
-    ]) {
+    for (const path of ['/login', '/recover', '/settings/password', '/settings/connected-apps']) {
       const response = await request(path, { headers: auth });
       assert.equal(response.status, 200, path);
       const document = await response.text();
@@ -143,7 +139,7 @@ test('Hono SPA routing, direct static assets, owner sessions and OAuth lifecycle
       assert.equal(response.headers.get('cache-control'), 'no-store');
     }
     assert.equal((await request('/auth.js')).status, 404);
-    assert.equal((await request('/settings/passkeys/add')).status, 302);
+    assert.equal((await request('/settings/password')).status, 302);
     assert.equal((await request('/settings/connected-apps')).status, 302);
     assert.equal((await request(assetPath)).status, 200);
     assert.equal(await (await request(assetPath)).text(), javascript.toString());
@@ -158,71 +154,6 @@ test('Hono SPA routing, direct static assets, owner sessions and OAuth lifecycle
       assert.equal(invalid.status, 400, path);
       assert.equal((await invalid.json()).error, 'invalid_request');
     }
-    // Real FK/replay guards: expired completed and abandoned ceremonies can be pruned,
-    // while an unexpired completed ceremony must retain its operation guard.
-    const cutoff = Math.floor(Date.now() / 1000);
-    const insertChallenge = (id, expires) =>
-      db
-        .prepare(
-          'INSERT INTO webauthn_challenges (id,challenge,purpose,browser_digest,auth_epoch,canonical_origin,rp_id,expires_at) VALUES (?, ?, ?, ?, 3, ?, ?, ?)',
-        )
-        .bind(id, 'challenge', 'add', 'browser', origin, 'whiteboard.example', expires);
-    const insertOperation = (id) =>
-      db
-        .prepare(
-          'INSERT INTO auth_operations (id,purpose,challenge_id,browser_digest,auth_epoch,created_at) VALUES (?, ?, ?, ?, 3, ?)',
-        )
-        .bind('op-' + id, 'add', id, 'browser', cutoff);
-    await db.batch([
-      insertChallenge('expired-completed', cutoff + 300),
-      insertOperation('expired-completed'),
-      insertChallenge('active-completed', cutoff + 300),
-      insertOperation('active-completed'),
-    ]);
-    await db
-      .prepare("UPDATE webauthn_challenges SET expires_at=? WHERE id='expired-completed'")
-      .bind(cutoff - 100)
-      .run();
-    await db.batch(
-      Array.from({ length: 34 }, (_, i) => insertChallenge('abandoned-' + i, cutoff - 50)),
-    );
-    const loginOptions = () =>
-      request('/auth/login/options', { method: 'POST', headers: mutation, body: '{}' });
-    assert.equal((await loginOptions()).status, 200);
-    assert.equal(
-      (
-        await db
-          .prepare('SELECT count(*) AS n FROM webauthn_challenges WHERE expires_at<=?')
-          .bind(cutoff)
-          .first()
-      ).n,
-      3,
-      'cleanup deletes at most 32 expired challenges',
-    );
-    assert.equal(
-      await db
-        .prepare("SELECT id FROM auth_operations WHERE challenge_id='expired-completed'")
-        .first(),
-      null,
-    );
-    assert.ok(
-      await db
-        .prepare("SELECT id FROM auth_operations WHERE challenge_id='active-completed'")
-        .first(),
-    );
-    assert.equal((await loginOptions()).status, 200);
-    assert.equal(
-      (
-        await db
-          .prepare('SELECT count(*) AS n FROM webauthn_challenges WHERE expires_at<=?')
-          .bind(cutoff)
-          .first()
-      ).n,
-      0,
-    );
-    const operationReplay = insertOperation('active-completed');
-    await assert.rejects(operationReplay.run(), /UNIQUE/);
-
     assert.equal(
       (await request('/api/preferences', { method: 'PUT', headers: mutation, body: '{' })).status,
       400,
@@ -254,11 +185,25 @@ test('Hono SPA routing, direct static assets, owner sessions and OAuth lifecycle
           headers: {
             ...auth,
             Origin: origin,
-            'Content-Type': 'image/png',
+            'Content-Type': 'text/plain',
             'Idempotency-Key': 'test',
           },
-          body: new Uint8Array(8 * 1024 * 1024 + 1),
+          // One character over the base64 text of an 8 MiB PNG.
+          body: 'A'.repeat(Math.ceil((8 * 1024 * 1024) / 3) * 4 + 1),
         })
+      ).status,
+      413,
+    );
+    assert.equal(
+      (
+        await request(
+          '/api/problems/p1/canvas?base_revision=0&edit_epoch=0&fingerprint=f&has_content=1',
+          {
+            method: 'PUT',
+            headers: { ...mutation, Origin: origin },
+            body: 'x'.repeat(4 * 1024 * 1024 + 1),
+          },
+        )
       ).status,
       413,
     );
@@ -390,8 +335,11 @@ test('Hono SPA routing, direct static assets, owner sessions and OAuth lifecycle
       problems: [{ title: 'Test', body: 'Test' }],
     });
     assert.match(await forbidden.text(), /"error":"forbidden"/);
-    const unimplemented = await callTool('list_problems', {});
-    assert.match(await unimplemented.text(), /"error":"not_implemented"/);
+    const readOnly = await callTool('list_problems', {});
+    assert.deepEqual((await readOnly.json()).result.structuredContent, {
+      problems: [],
+      next_cursor: null,
+    });
     const csrfFailure = await request('/api/preferences', {
       method: 'PUT',
       headers: { ...mutation, Origin: 'https://evil.example' },
@@ -439,22 +387,8 @@ test('Hono SPA routing, direct static assets, owner sessions and OAuth lifecycle
       limited = await request('/setup', { headers: { 'CF-Connecting-IP': '192.0.2.42' } });
     assert.equal(limited.status, 429);
     assert.equal((await limited.json()).error, 'rate_limited');
-    // A ceremony read under epoch 3 must still fail at commit after recovery increments it.
-    await db
-      .prepare(
-        "INSERT INTO webauthn_challenges (id,challenge,purpose,browser_digest,auth_epoch,canonical_origin,rp_id,expires_at) VALUES ('stale-epoch','c','add','browser',3,?, ?,unixepoch()+300)",
-      )
-      .bind('https://example.test', 'example.test')
-      .run();
+    // Recovery advances the epoch: sessions and MCP tokens issued under epoch 3 stop working.
     await db.prepare('UPDATE auth_state SET auth_epoch=4').run();
-    await assert.rejects(
-      db
-        .prepare(
-          "INSERT INTO auth_operations (id,purpose,challenge_id,browser_digest,auth_epoch,created_at) VALUES ('stale-operation','add','stale-epoch','browser',3,unixepoch())",
-        )
-        .run(),
-      /invalid_ceremony/,
-    );
 
     assert.equal((await request('/api/me', { headers: auth })).status, 401);
     assert.equal((await request('/app', { headers: auth })).status, 302);

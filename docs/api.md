@@ -1,29 +1,29 @@
 # API contracts
 
-Hono owns the complete route tree. The authenticated product router is mounted at `/api`; account and OAuth routes are described in [Authentication](auth-integration.md). The transport adapters and validation below are implemented. Product service methods currently return `501 not_implemented` over HTTP or an MCP tool error with the same code. The response types describe the implementation target.
+Hono owns the complete route tree. The authenticated product router is mounted at `/api`; account and OAuth routes are described in [Authentication](auth-integration.md). Response types are defined in `src/shared/model.ts`.
 
 ## Browser API
 
 All `/api/*` product routes require the owner session. Mutations require a matching `Origin`; WebSocket upgrades also require same-origin `Origin`.
 
-| Method and route                                                    | Contract                                                |
-| ------------------------------------------------------------------- | ------------------------------------------------------- |
-| `GET /api/collections`                                              | Collection summaries, including sets                    |
-| `GET /api/problems`                                                 | Filtered page of problem summaries and `next_cursor`    |
-| `GET /api/problems/:id`                                             | Problem, submission history and feedback                |
-| `GET /api/problems/:id/canvas`                                      | Stored document body; revision, epoch, state in headers |
-| `PUT /api/problems/:id/canvas?base_revision&edit_epoch&fingerprint` | Document body, stored verbatim                          |
-| `POST /api/problems/:id/submissions?revision&edit_epoch`            | Base64 PNG text and `Idempotency-Key`; new or reused    |
-| `POST /api/problems/:id/resume`                                     | Resume the same canvas; return the current edit epoch   |
-| `GET /api/snapshots/:id/image`                                      | Authenticated immutable base64 PNG text                 |
-| `GET /api/preferences`                                              | Preferences object                                      |
-| `PUT /api/preferences`                                              | Merge keys; `null` removes a key                        |
-| `GET /api/changes?since&timeout`                                    | Current counter without `since`; bounded wait otherwise |
-| `GET /api/changes/socket`                                           | Upgrade to notification-only ChangeHub                  |
+| Method and route                                                                | Contract                                                                                         |
+| ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| `GET /api/collections`                                                          | Collection summaries, including sets                                                             |
+| `GET /api/problems`                                                             | Filtered page of problem summaries and `next_cursor`                                             |
+| `GET /api/problems/:id`                                                         | Problem, submission history and feedback                                                         |
+| `GET /api/problems/:id/canvas`                                                  | Stored document body (204 before the first save); revision, epoch, state, fingerprint in headers |
+| `PUT /api/problems/:id/canvas?base_revision&edit_epoch&fingerprint&has_content` | Document body, stored verbatim                                                                   |
+| `POST /api/problems/:id/submissions?revision&edit_epoch`                        | Base64 PNG text and `Idempotency-Key`; new or reused                                             |
+| `POST /api/problems/:id/resume`                                                 | Resume the same canvas; return the current edit epoch                                            |
+| `GET /api/snapshots/:id/image`                                                  | Authenticated immutable base64 PNG text                                                          |
+| `GET /api/preferences`                                                          | Preferences object                                                                               |
+| `PUT /api/preferences`                                                          | Merge keys; `null` removes a key                                                                 |
+| `GET /api/changes?since&timeout`                                                | Current counter without `since`; bounded wait otherwise                                          |
+| `GET /api/changes/socket`                                                       | Upgrade to notification-only ChangeHub                                                           |
 
-List filters are `collection_id`, `set_id`, `answer_state`, `cursor` and `limit` (1–100). Pass the returned cursor back with the same filters. `src/web/api.ts` accepts these parameters directly. Cursors are opaque to the browser; the current schema caps them at 20 characters, so the future repository implementation must fit that contract or revise both together.
+List filters are `collection_id`, `set_id`, `answer_state`, `cursor` and `limit` (1–100). Pass the returned cursor back with the same filters. `src/web/api.ts` accepts these parameters directly. Cursors are opaque to the browser and at most 20 characters; the list is ordered by creation.
 
-JSON writes require `Content-Type: application/json`. A canvas save sends the tldraw document as the body, with `base_revision`, `edit_epoch` and the browser-computed answer `fingerprint` as query parameters. The Worker checks `Content-Length` against the limit and streams the body to R2 without parsing it; `GET` returns the stored body unchanged, with revision, edit epoch and answer state in response headers, so a document that fails to load cannot hide its metadata. Content validity is the browser's responsibility; see [Canvas trust boundary](architecture.md#canvas-trust-boundary). The current route adapter still parses the JSON envelope; it changes to this contract together with the canvas service. A submission body is the base64 text of the PNG (`text/plain`); an empty body represents a possible reuse request, which the service must validate against the current content. The Worker validates the PNG header and dimensions from the first 32 characters and streams the rest to R2 without decoding it; see [Snapshot image representation](architecture.md#snapshot-image-representation). The current route adapter still accepts an `image/png` body and reads it into memory; it changes to this contract together with the submission service.
+JSON writes require `Content-Type: application/json`. A canvas save sends the tldraw document as the body, with `base_revision`, `edit_epoch` and the browser-computed answer `fingerprint` as query parameters. The Worker requires `Content-Length` (411 without it), checks it against the limit and streams the body to R2 without parsing it; `GET` returns the stored body unchanged, with revision, edit epoch and answer state in response headers, so a document that fails to load cannot hide its metadata. Content validity is the browser's responsibility; see [Canvas trust boundary](architecture.md#canvas-trust-boundary). A submission body is the base64 text of the PNG (`text/plain`); an empty body asks to reuse the latest Snapshot, which the service accepts only when the saved content's fingerprint equals that Snapshot's, and otherwise rejects with `invalid_request`. The Worker validates the PNG header and dimensions from the first 32 characters, streams the rest to R2 without decoding it, and rejects the upload (`invalid_request`, nothing stored) if any byte is not base64; see [Snapshot image representation](architecture.md#snapshot-image-representation). The image route returns that stored text unchanged (`text/plain`).
 
 ## MCP tools
 
@@ -38,7 +38,9 @@ The endpoint is hand-rolled (`src/server/mcp/handler.ts`) rather than built on t
 | `get_submission`  | `problem_id`; latest committed Snapshot only, with a PNG image content block and structured context. Without a Snapshot, returns `status: not_ready`.                                                              |
 | `append_feedback` | Required `problem_id`, explicit `snapshot_id` and `feedback`; optional verdict, callouts and `idempotency_key`. History is append-only.                                                                            |
 
-For `get_submission`, `answer_state` and `has_unsubmitted_changes` describe the server-known draft. They cannot describe unsynced strokes on an offline device. Feedback is attached to the supplied Snapshot, never whichever Snapshot happens to be latest at write time.
+A callout is `{ kind, math?, text }`: `kind` is `correct`, `fix` or `incorrect` (shown green, amber or red in the review card), `math` optionally quotes the step as display LaTeX, and `text` explains it.
+
+`get_submission` streams the stored base64 image into the JSON-RPC response without decoding it, with an exact `Content-Length`. For `get_submission`, `answer_state` and `has_unsubmitted_changes` describe the server-known draft. They cannot describe unsynced strokes on an offline device. Feedback is attached to the supplied Snapshot, never whichever Snapshot happens to be latest at write time.
 
 Creation retries reuse `request_id`. Feedback retries are deduplicated only when `idempotency_key` is supplied. Service implementations must bind keys to operation scope and input fingerprint, returning `idempotency_conflict` for reuse with different content.
 

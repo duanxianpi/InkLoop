@@ -1,7 +1,7 @@
 # InkLoop — Product Specification
 
 **Version:** 1.0 — Product behavior requirements  
-**Status:** Implementation target; product services and canvas UI are not yet implemented  
+**Status:** Implementation target; implemented except for the release checks listed in [Architecture](architecture.md#2-current-implementation-status)  
 **Product:** InkLoop  
 **Tagline:** _Give your AI a whiteboard._  
 **Architecture:** Bring Your Own AI · Pen-first · MCP-native · Self-hosted

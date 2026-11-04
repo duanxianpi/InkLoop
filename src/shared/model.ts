@@ -25,11 +25,17 @@ export interface SnapshotSummary {
   problem_id: string;
   sequence: number;
   source_revision: number;
+  /** Answer fingerprint of the committed content; equal content reuses this Snapshot. */
+  fingerprint: string;
+  width: number;
+  height: number;
   created_at: string;
 }
 
+export type CalloutKind = 'correct' | 'fix' | 'incorrect';
 export interface Callout {
-  label: string;
+  kind: CalloutKind;
+  math?: string;
   text: string;
 }
 export interface FeedbackEntry {
@@ -69,9 +75,12 @@ export interface ProblemDetail extends ProblemSummary {
   body: string;
   edit_epoch: number;
   canvas_revision: number;
+  canvas_fingerprint: string | null;
   has_content: boolean;
   has_unsubmitted_changes: boolean;
+  /** Ordered by sequence. */
   snapshots: SnapshotSummary[];
+  /** Ordered by creation. */
   feedback: FeedbackEntry[];
 }
 
@@ -86,13 +95,19 @@ export interface CanvasDocument {
   store: Record<string, { id: string; typeName: string; [key: string]: unknown }>;
   schema: unknown;
 }
-export interface CanvasState {
-  problem_id: string;
+/** Sent as response headers with the stored document body, so a body that fails to load cannot hide them. */
+export interface CanvasMeta {
   revision: number;
   edit_epoch: number;
   answer_state: AnswerState;
-  document: CanvasDocument | null;
+  fingerprint: string | null;
 }
+export const CANVAS_HEADERS = {
+  revision: 'X-Canvas-Revision',
+  edit_epoch: 'X-Edit-Epoch',
+  answer_state: 'X-Answer-State',
+  fingerprint: 'X-Canvas-Fingerprint',
+} as const;
 export interface SaveCanvasResult {
   problem_id: string;
   revision: number;
@@ -128,7 +143,8 @@ export interface Submission {
   answer_state: AnswerState;
   has_unsubmitted_changes: boolean;
   question: Question;
-  image: { mimeType: 'image/png'; data: string };
+  /** Stored base64 PNG text, streamed into the MCP response without decoding. */
+  image: { mimeType: 'image/png'; body: ReadableStream<Uint8Array>; length: number };
 }
 export interface NotReady {
   status: 'not_ready';

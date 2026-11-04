@@ -1,8 +1,11 @@
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { AuthPage } from './auth/AuthPage';
 import type { AuthPageData, ConsentData } from '../shared/auth';
 import './auth/styles.css';
 import { pageForPath } from '../shared/pages';
+
+// The board (tldraw, MathJax, fonts) is its own chunk; account pages never load it.
+const Board = lazy(() => import('./board/Board').then((module) => ({ default: module.Board })));
 
 /** One browser entry. Hono serves this shell and enforces access on every private API. */
 export function App() {
@@ -49,7 +52,7 @@ export function App() {
         const result = (await response.json()) as { initialized: boolean };
         if (!controller.signal.aborted)
           setData({
-            kind: 'passkey',
+            kind: 'password',
             purpose: page!.purpose!,
             initialized: result.initialized,
             origin: location.origin,
@@ -62,7 +65,12 @@ export function App() {
     return () => controller.abort();
   }, [page, isAccount]);
 
-  if (!isAccount) return <main id="app" />; // Product canvas is still an architecture shell.
+  if (!isAccount)
+    return (
+      <Suspense fallback={null}>
+        <Board />
+      </Suspense>
+    );
   if (data) return <AuthPage data={data} />;
   return (
     <main className="auth-page">

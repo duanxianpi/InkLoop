@@ -1,10 +1,10 @@
 # Deployment and recovery
 
-The repository currently deploys an authentication foundation and an empty product shell. Deployment does not enable the unimplemented drawing, storage or feedback services.
+The repository deploys the complete InkLoop Worker: password sign-in, the handwriting board, canvas and Snapshot storage, feedback, live updates and the OAuth-protected MCP endpoint. Data export/restore and collection of unreferenced R2 objects are not implemented yet; see [Architecture](architecture.md#12-remaining-release-work).
 
 ## Requirements
 
-Use Node.js 22.12 or later, the committed npm lockfile, and a Cloudflare account with Workers, D1, KV and R2 available. Use an HTTPS deployment address that can remain stable: owner setup binds Passkeys and OAuth to it. No upstream OAuth app, Cloudflare Access policy or model API key is required.
+Use Node.js 22.12 or later, the committed npm lockfile, and a Cloudflare account with Workers, D1, KV and R2 available. Use an HTTPS deployment address that can remain stable: owner setup binds sign-in and OAuth to it. No upstream OAuth app, Cloudflare Access policy or model API key is required.
 
 The configuration declares one Worker, a D1 database, an OAuth KV namespace, a private R2 bucket, a SQLite-backed ChangeHub Durable Object and an authentication rate-limit binding. Billing and account availability depend on the deployment's Cloudflare settings; this project does not promise a free operating tier.
 
@@ -27,14 +27,14 @@ The deploy command regenerates `dist/public/`, including versioned drawing asset
 
 Import your copy of this repository into Cloudflare Workers using its Git integration. Configure `npm run typecheck` as the build command and `npm run deploy` as the deploy command. The deploy script performs the actual asset build before migration or publication. Use the repository's `wrangler.jsonc` and migrations. Complete any platform prompts for resource availability, including R2.
 
-This describes the intended InkLoop deployment procedure. An isolated deployment has exercised real authentication, OAuth and MCP transport on Cloudflare; see [CPU measurements](performance.md). Full first-install/upgrade acceptance through the deployment script and physical-device Passkeys remain release checks.
+This describes the intended InkLoop deployment procedure. An isolated deployment has exercised real authentication, OAuth and MCP transport on Cloudflare; see [CPU measurements](performance.md). Full first-install/upgrade acceptance through the deployment script remains a release check.
 
 ## Claim the owner
 
 1. Open `/setup` at the permanent HTTPS address.
 2. In Cloudflare Dashboard, open the Worker's **DB** binding and inspect `admin_keys`.
 3. Copy `secret_display` from the `bootstrap` row into the setup form. The website never retrieves or displays this key.
-4. Confirm the displayed origin and register a Passkey.
+4. Confirm the displayed origin and choose a password. Any password is accepted; a longer one is recommended.
 5. The bootstrap key is consumed. The recovery key is stored in the D1 `recovery` row.
 
 The same key can be read in the D1 console with:
@@ -47,13 +47,15 @@ After initialization, `/app` requires the owner session. Add compatible MCP clie
 
 ## Recovery and connected applications
 
-Open `/recover`, retrieve the `recovery` key from D1, and register a replacement Passkey. Successful recovery rotates that key and invalidates previous Passkeys, Web sessions and MCP authorizations. Retrieve the new key from D1 when needed; keep it out of URLs, logs and source control.
+If you forget the password, open `/recover`, retrieve the `recovery` key from D1, and choose a new password. Successful recovery rotates that key and invalidates previous Web sessions and MCP authorizations. Retrieve the new key from D1 when needed; keep it out of URLs, logs and source control.
 
-Use `/settings/passkeys/add` to add a Passkey after recent sign-in. Use `/settings/connected-apps` to inspect and revoke a particular MCP authorization; revocation also requires recent sign-in. Signing out of the Web does not revoke an independently authorized MCP client.
+Use `/settings/password` to change the password; it requires the current password and signs out other devices. Use `/settings/connected-apps` to inspect and revoke a particular MCP authorization; revocation also requires recent sign-in. Signing out of the Web does not revoke an independently authorized MCP client.
 
 ## Upgrades and durability
 
-The Worker is named `inkloop`. An instance deployed before the rename, as `agent-whiteboard`, must keep its old name in `wrangler.jsonc`: a new name creates a different Worker with a different `workers.dev` address and newly provisioned resources, and its existing Passkeys and OAuth grants are bound to the old origin.
+The Worker is named `inkloop`. An instance deployed before the rename, as `agent-whiteboard`, must keep its old name in `wrangler.jsonc`: a new name creates a different Worker with a different `workers.dev` address and newly provisioned resources, and its existing sign-in and OAuth grants are bound to the old origin.
+
+Upgrading a deployment that used Passkeys applies `0005_password.sql`, which removes them. Sign in once through `/recover` with the recovery key to choose a password.
 
 Never rewrite migrations `0001`–`0003` on a deployed instance. Append migrations and preserve binding identities. A code rollback does not reverse database migrations.
 

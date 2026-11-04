@@ -8,8 +8,29 @@ export interface ConsentData {
   scopes: string[];
   handle: string;
 }
-export type PasskeyPurpose = 'bootstrap' | 'recovery' | 'login' | 'add';
+export type PasswordPurpose = 'setup' | 'login' | 'recovery' | 'change';
 export type AuthPageData =
-  | { kind: 'passkey'; purpose: PasskeyPurpose; initialized: boolean; origin: string }
+  | { kind: 'password'; purpose: PasswordPurpose; initialized: boolean; origin: string }
   | ({ kind: 'consent' } & ConsentData)
   | { kind: 'connections' };
+
+/**
+ * The browser stretches the password with PBKDF2-SHA256 before sending it, so the Worker (10 ms CPU
+ * on Workers Free) only hashes the stretched value once. Raise `iterations` for new passwords; stored
+ * passwords keep the iterations they were created with.
+ */
+export const PASSWORD_KDF = {
+  iterations: 600_000,
+  minIterations: 600_000,
+  maxIterations: 10_000_000,
+};
+
+/** Public parameters for signing in: the stored salt and iteration count. */
+export interface PasswordParams {
+  salt: string;
+  iterations: number;
+}
+/** A new password as the server receives it. `derived` is base64url of the 32-byte PBKDF2 output. */
+export interface PasswordCredential extends PasswordParams {
+  derived: string;
+}

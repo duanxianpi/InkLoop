@@ -6,6 +6,13 @@ import { loadSource } from './load-source.mjs';
 // The hand-rolled MCP endpoint (src/server/mcp/handler.ts), exercised in process without OAuth.
 // The official MCP client is the conformance reference; edge cases below cover what it never sends.
 
+// workerd's FixedLengthStream, for the streamed get_submission image: a pass-through in Node.
+globalThis.FixedLengthStream ??= class extends TransformStream {
+  constructor() {
+    super();
+  }
+};
+
 const { handleMcp, HttpError } = await loadSource(
   'src/server/mcp/handler.ts',
   'src/server/http/errors.ts',
@@ -34,11 +41,18 @@ function fakeServices(calls = []) {
       list: record('problems.list', { problems: [], next_cursor: null }),
     },
     submissions: {
-      latest: record('submissions.latest', {
-        status: 'ready',
-        snapshot_id: 'snap1',
-        image: { mimeType: 'image/png', data: 'iVBORw0KGgo=' },
-      }),
+      latest: async (input) => {
+        calls.push(['submissions.latest', input]);
+        return {
+          status: 'ready',
+          snapshot_id: 'snap1',
+          image: {
+            mimeType: 'image/png',
+            body: new Blob(['iVBORw0KGgo=']).stream(),
+            length: 12,
+          },
+        };
+      },
     },
     feedback: { append: record('feedback.append', { feedback_id: 'f1' }) },
   };
@@ -96,6 +110,7 @@ test('the official MCP client connects, lists and calls every tool', async () =>
     });
     assert.deepEqual(submission.structuredContent, { status: 'ready', snapshot_id: 'snap1' });
     assert.equal(submission.content[1].type, 'image');
+    assert.equal(submission.content[1].data, 'iVBORw0KGgo=', 'stored base64 is streamed verbatim');
 
     const feedback = await client.callTool({
       name: 'append_feedback',

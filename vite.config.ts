@@ -8,5 +8,7 @@ export default defineConfig({
   build: {
     outDir: '../../dist/public',
     emptyOutDir: true,
+    // Fonts and images stay files: CSP allows font-src 'self', not data: URLs.
+    assetsInlineLimit: 0,
   },
 });

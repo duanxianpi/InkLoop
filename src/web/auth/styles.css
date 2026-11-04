@@ -52,6 +52,11 @@
   margin-top: 8px;
   background: white;
 }
+.auth-page .hint {
+  margin: -8px 0 16px;
+  font-size: 14px;
+  color: #5f6670;
+}
 .auth-page .check {
   padding: 8px 0;
   min-height: 44px;
