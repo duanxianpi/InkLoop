@@ -1,4 +1,5 @@
-import { cp, mkdir, readFile } from 'node:fs/promises';
+import { cp, mkdir, readdir, readFile } from 'node:fs/promises';
+import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { build } from 'esbuild';
 import { build as buildWeb } from 'vite';
@@ -24,6 +25,33 @@ for (const name of ['fonts', 'icons', 'translations', 'embed-icons', 'LICENSE.md
     recursive: true,
   });
 }
+
+// The service worker is served from the site root. It lists this build's files, so its own bytes
+// (and with them its version) change whenever the shell or anything it loads changes.
+const files = (await readdir(path('dist/public/assets'), { recursive: true, withFileTypes: true }))
+  .filter((entry) => entry.isFile())
+  .map((entry) => '/' + relative(path('dist/public'), join(entry.parentPath, entry.name)));
+const tldraw = `/assets/tldraw/${assetManifest.version}/`;
+// What the board loads to open: Vite's scripts, styles and woff2 fonts, and tldraw's fonts, embed
+// icons, icon sprite and English strings. Account-page images and other languages load on demand.
+const opensBoard = (file) =>
+  file.startsWith(tldraw)
+    ? /^(fonts|embed-icons)\/|^icons\/icon\/0_merged\.svg$|^translations\/en\.json$/.test(
+        file.slice(tldraw.length),
+      )
+    : /^\/assets\/[^/]+\.(js|css|woff2)$/.test(file);
+await build({
+  entryPoints: [path('src/sw/sw.ts')],
+  bundle: true,
+  format: 'iife',
+  platform: 'browser',
+  target: 'es2022',
+  define: {
+    BUILD_FILES: JSON.stringify(files.sort()),
+    PRECACHE: JSON.stringify(files.filter(opensBoard)),
+  },
+  outfile: path('dist/public/sw.js'),
+});
 
 // The Worker imports the generated tools/list, so it is refreshed before bundling.
 await generateToolList();

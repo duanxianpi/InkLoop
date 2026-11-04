@@ -1,0 +1,22 @@
+{
+  "id": "/",
+  "name": "InkLoop",
+  "short_name": "InkLoop",
+  "description": "A handwriting whiteboard for working problems with your AI agent.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#fafaf8",
+  "theme_color": "#fafaf8",
+  "icons": [
+    { "src": "/assets/brand/inkloop-v2.svg", "sizes": "any", "type": "image/svg+xml" },
+    { "src": "/assets/brand/inkloop-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/assets/brand/inkloop-512.png", "sizes": "512x512", "type": "image/png" },
+    {
+      "src": "/assets/brand/inkloop-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

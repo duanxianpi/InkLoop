@@ -18,7 +18,12 @@ test('Hono SPA routing, direct static assets, owner sessions and OAuth lifecycle
     { config: new URL('../wrangler.jsonc', import.meta.url).pathname },
     { hideWarnings: true },
   );
-  assert.deepEqual(config.assets.run_worker_first, ['/*', '!/assets/*']);
+  assert.deepEqual(config.assets.run_worker_first, [
+    '/*',
+    '!/assets/*',
+    '!/sw.js',
+    '!/manifest.webmanifest',
+  ]);
   const mf = new Miniflare(
     convertV4MiniflareOptions({
       modules: true,
@@ -47,11 +52,26 @@ test('Hono SPA routing, direct static assets, owner sessions and OAuth lifecycle
     assert.match(publicAsset.headers.get('content-type'), /javascript/);
     assert.equal(publicAsset.headers.get('cache-control'), 'public, max-age=31536000, immutable');
     assert.equal(publicAsset.headers.get('x-content-type-options'), 'nosniff');
+    // The PWA files live at the root, outside the Worker, and are revalidated on every load.
+    for (const [path, type] of [
+      ['/sw.js', /javascript/],
+      ['/manifest.webmanifest', /manifest\+json/],
+    ]) {
+      const response = await mf.dispatchFetch('https://whiteboard.example' + path);
+      assert.equal(response.status, 200, path);
+      assert.match(response.headers.get('content-type'), type);
+      assert.equal(response.headers.get('cache-control'), 'no-cache');
+      await response.arrayBuffer();
+    }
     const db = await mf.getD1Database('DB');
     await applyMigrations(db);
     const origin = 'https://whiteboard.example';
     const setup = await mf.dispatchFetch(origin + '/setup');
     assert.equal(setup.status, 200, await setup.clone().text());
+    assert.match(
+      setup.headers.get('content-security-policy'),
+      /manifest-src 'self'; worker-src 'self'/,
+    );
     const setupHtml = await setup.text();
     assert.equal(setupHtml, html.toString());
     assert.match(setupHtml, /src="\/assets\//);

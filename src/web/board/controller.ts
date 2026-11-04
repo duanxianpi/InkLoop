@@ -9,7 +9,7 @@ import type { Camera, Engine, InkColor, Tool } from '../canvas/engine';
 import { attachGestures } from '../canvas/gestures';
 import { CanvasSync, type SaveStatus } from '../sync/canvasSync';
 import { ChangeFeed } from '../sync/changeFeed';
-import { drafts } from '../sync/drafts';
+import { drafts, savedCanvases } from '../sync/drafts';
 import { createStore } from './store';
 import { inSet } from './view';
 
@@ -456,8 +456,11 @@ export class BoardController {
     let document: string | null = null;
     let locked = knownDetail?.answer_state === 'ready_for_review';
     if (stored instanceof ApiError) {
-      // Offline: continue from this device's copy, if there is one.
-      document = sync?.unsaved?.document ?? draft?.document ?? cached ?? null;
+      // Offline: continue from this device's newest copy, always together with the revision it
+      // belongs to. An upload can then only conflict with newer server content, never replace it.
+      const saved = sync || draft ? null : await savedCanvases.get(id);
+      if (token !== this.showToken) return;
+      document = sync?.unsaved?.document ?? draft?.document ?? cached ?? saved?.document ?? null;
       if (!document && knownDetail?.has_content !== false) {
         this.set({ canvas: 'unavailable' });
         return;
@@ -469,8 +472,21 @@ export class BoardController {
           fingerprint: null,
         });
         sync.restore(draft);
+      } else if (!sync && saved) {
+        sync = this.createSync(id, {
+          revision: saved.revision,
+          edit_epoch: saved.edit_epoch,
+          fingerprint: saved.fingerprint,
+        });
       }
     } else {
+      void savedCanvases.put({
+        problem_id: id,
+        document: stored.document,
+        fingerprint: stored.meta.fingerprint,
+        revision: stored.meta.revision,
+        edit_epoch: stored.meta.edit_epoch,
+      });
       locked = stored.meta.answer_state === 'ready_for_review';
       document = this.chooseDocument(id, stored, sync, draft);
       sync = this.syncs.get(id);
@@ -846,6 +862,7 @@ export class BoardController {
       local.set('cameras', this.cameras);
     }
     void drafts.remove(id);
+    void savedCanvases.remove(id);
   }
 
   /** No problem is open: an empty, locked canvas. A pending load for a deleted problem is cancelled. */

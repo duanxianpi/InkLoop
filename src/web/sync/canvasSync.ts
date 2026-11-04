@@ -1,5 +1,5 @@
 import { api, ApiError } from '../api';
-import { drafts, type Draft } from './drafts';
+import { drafts, savedCanvases, type Draft } from './drafts';
 
 // One serial save queue per Problem (Architecture §7). Content is stored locally before any
 // request; each request is tagged with the local version it confirms, and "saved" is reported only
@@ -175,6 +175,13 @@ export class CanvasSync {
         );
         this.retryMs = 0;
         this.base = { ...this.base, revision: result.revision, fingerprint: content.fingerprint };
+        void savedCanvases.put({
+          problem_id: this.problemId,
+          document: content.document,
+          fingerprint: content.fingerprint,
+          revision: result.revision,
+          edit_epoch: this.base.edit_epoch,
+        });
         if (this.latest.version === content.version) {
           this.latest = null;
           await drafts.settle(this.problemId, content.version);

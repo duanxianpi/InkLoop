@@ -7,7 +7,7 @@ import { loadSource } from './load-source.mjs';
 // Browser-side logic that does not need a browser: the save queue, untrusted text rendering and
 // the shared review-status derivation. IndexedDB is absent in Node, so drafts use memory only.
 
-const { CanvasSync, drafts } = await loadSource(
+const { CanvasSync, drafts, savedCanvases } = await loadSource(
   'src/web/sync/canvasSync.ts',
   'src/web/sync/drafts.ts',
 );
@@ -189,6 +189,92 @@ test('a save to a deleted problem stops instead of retrying', async () => {
     sync.dispose();
   } finally {
     stub.restore();
+  }
+});
+
+test('an acknowledged save is kept on the device with its revision', async () => {
+  const stub = stubFetch(async () => saved(9));
+  try {
+    const sync = new CanvasSync('p6', { revision: 8, edit_epoch: 1, fingerprint: 'f0' }, () => {});
+    sync.change(content(1));
+    await sync.flush();
+    assert.deepEqual(await savedCanvases.get('p6'), {
+      problem_id: 'p6',
+      document: '{"n":1}',
+      fingerprint: '1:f1',
+      revision: 9,
+      edit_epoch: 1,
+    });
+    // An older acknowledgement arriving late never replaces a later one.
+    await savedCanvases.put({ ...(await savedCanvases.get('p6')), revision: 3, document: 'old' });
+    assert.equal((await savedCanvases.get('p6')).revision, 9);
+    sync.dispose();
+  } finally {
+    stub.restore();
+  }
+});
+
+test('offline, the board shows only content it can save on top of: never stale over newer', async () => {
+  globalThis.innerWidth ??= 1024;
+  globalThis.getComputedStyle ??= () => ({ getPropertyValue: () => '' });
+  globalThis.document ??= { documentElement: {} };
+  // One bundle, so the controller and the test share the device's stores.
+  const device = await loadSource('src/web/board/controller.ts', 'src/web/sync/drafts.ts');
+  const offline = stubFetch(async () => {
+    throw new TypeError('Failed to fetch');
+  });
+  const opened = async (id) => {
+    const board = new device.BoardController();
+    const loads = [];
+    board.engine = {
+      load: (document) => loads.push(document),
+      count: () => 0,
+      getCamera: () => null,
+      setCamera() {},
+      capture: () => ({ has_content: true, fingerprint: 'shown' }),
+      setTool() {},
+    };
+    board.set({ problems: [{ id }], currentId: id });
+    await board.open(id);
+    return { board, shown: loads.at(-1), base: board.syncs.get(id)?.current };
+  };
+  try {
+    // The last acknowledged save: 7 strokes at revision 6.
+    await device.savedCanvases.put({
+      problem_id: 'p7',
+      document: '{"strokes":7}',
+      fingerprint: '1:seven',
+      revision: 6,
+      edit_epoch: 0,
+    });
+    const fromCopy = await opened('p7');
+    assert.equal(fromCopy.shown, '{"strokes":7}');
+    assert.equal(fromCopy.base.revision, 6, 'the copy is shown with its own revision');
+    assert.equal(fromCopy.board.state.canvas, 'ready');
+
+    // A draft on top of it wins, again with the revision it was written on.
+    await device.drafts.put({
+      problem_id: 'p7',
+      document: '{"strokes":8}',
+      fingerprint: '1:eight',
+      has_content: true,
+      base_revision: 6,
+      edit_epoch: 0,
+      version: 1,
+      updated_at: 1,
+    });
+    const fromDraft = await opened('p7');
+    assert.equal(fromDraft.shown, '{"strokes":8}');
+    assert.equal(fromDraft.base.revision, 6);
+    assert.equal(fromDraft.board.syncs.get('p7').unsaved.document, '{"strokes":8}');
+    fromDraft.board.syncs.get('p7').dispose();
+
+    // Nothing on this device: unavailable rather than an empty canvas that could be saved over.
+    const nothing = await opened('p8');
+    assert.equal(nothing.board.state.canvas, 'unavailable');
+    assert.equal(nothing.base, undefined);
+  } finally {
+    offline.restore();
   }
 });
 

@@ -10,7 +10,7 @@ export async function serveSpa(c: Context<ServerEnv>) {
   // MathJax's SVG output, inject <style> elements.
   response.headers.set(
     'Content-Security-Policy',
-    "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data: blob:; font-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'",
+    "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data: blob:; font-src 'self'; manifest-src 'self'; worker-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'",
   );
   return response;
 }

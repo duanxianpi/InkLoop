@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "build": "node src/tooling/build.mjs",
-    "typecheck": "tsc --noEmit && tsc --noEmit -p src/web",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p src/web && tsc --noEmit -p src/sw",
     "perf": "node --test tests/mcp-cpu.perf.mjs",
     "test": "node --test --test-concurrency=1 tests/*.test.mjs",
     "deploy": "node src/tooling/deploy.mjs",

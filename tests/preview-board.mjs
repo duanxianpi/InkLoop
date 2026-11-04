@@ -78,7 +78,7 @@ const mf = new Miniflare(
       directory: 'dist/public',
       binding: 'ASSETS',
       routerConfig: { has_user_worker: true },
-      run_worker_first: ['/*', '!/assets/*'],
+      run_worker_first: ['/*', '!/assets/*', '!/sw.js', '!/manifest.webmanifest'],
       assetConfig: { html_handling: 'none', not_found_handling: 'none' },
     },
     bindings: process.env.PREVIEW_D1_CONSOLE_URL

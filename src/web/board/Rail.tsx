@@ -1,5 +1,6 @@
 import { INK, type InkColor } from '../canvas/engine';
 import { CopyButton, mcpUrl } from '../design/Copy';
+import { forgetOfflineData } from '../pwa';
 import type { BoardController, BoardState } from './controller';
 import { EraserIcon, PenIcon, RedoIcon, SettingsIcon, UndoIcon } from './icons';
 
@@ -98,6 +99,7 @@ function Toggle({ on, label, onClick }: { on: boolean; label: string; onClick():
 function Settings({ s, c }: { s: BoardState; c: BoardController }) {
   const signOut = async () => {
     await fetch('/logout', { method: 'POST', credentials: 'same-origin' }).catch(() => undefined);
+    await forgetOfflineData().catch(() => undefined);
     location.assign('/login');
   };
   return (
