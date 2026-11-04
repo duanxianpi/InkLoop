@@ -150,6 +150,7 @@ export class BoardController {
   /** The current camera is the untouched default, so it follows the tile's measured height. */
   private defaultCamera = false;
   private tileHeight = 220;
+  private paperZoom = 1;
   private world: { world: HTMLElement; paper: HTMLElement; under: HTMLElement } | null = null;
   private tile: HTMLElement | null = null;
   private qrow: HTMLElement | null = null;
@@ -311,7 +312,9 @@ export class BoardController {
   registerTile(element: HTMLElement | null) {
     this.tile = element;
   }
+  /** `height` is as laid out at the current zoom; the tile is stored at zoom 1. */
   tileResized(height: number) {
+    height /= this.paperZoom;
     if (!height || Math.abs(height - this.tileHeight) < 2) return;
     this.tileHeight = height;
     if (this.defaultCamera && this.engine && this.state.canvas === 'ready')
@@ -326,8 +329,10 @@ export class BoardController {
         // Whole device pixels: a fractional offset resamples the printed question and blurs it.
         const snap = (value: number) => Math.round(value * devicePixelRatio) / devicePixelRatio;
         world.style.transform = `translate(${snap(camera.x)}px, ${snap(camera.y)}px)`;
-        // Zoomed, not scaled, like the chrome: a scale transform smears the question's math in WebKit.
-        paper.style.zoom = String(camera.z);
+        // Laid out at the zoom (see .qtile), never scaled or CSS-zoomed: a scale transform smears
+        // the question's math, and WebKit's zoom shrinks the tile without shrinking its text.
+        this.paperZoom = camera.z;
+        paper.style.setProperty('--z', String(camera.z));
         const grid = 28 * camera.z;
         under.style.backgroundSize = `${grid}px ${grid}px`;
         under.style.backgroundPosition = `${camera.x}px ${camera.y}px`;
@@ -342,10 +347,8 @@ export class BoardController {
     const width = innerWidth;
     const narrow = width < NARROW;
     const { hand } = this.state.prefs;
-    // Screen pixels clear of the tool rail, which is drawn at the design's chrome scale.
-    const scale =
-      Number(getComputedStyle(document.documentElement).getPropertyValue('--chrome-scale')) || 0.75;
-    const rail = Math.round(96 * scale);
+    // Screen pixels clear of the tool rail.
+    const rail = 72;
     const left = narrow ? 9 : hand === 'right' ? rail : 18;
     const right = narrow ? 9 : hand === 'left' ? rail : 18;
     const z = clamp((width - left - right) / 480, 0.5, 1);

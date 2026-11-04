@@ -27,7 +27,7 @@ export function TopRight({ s, c, detail }: Props) {
       )}
       {ready ? (
         <button className="fin" disabled={s.canvas !== 'ready'} onClick={() => void c.resume()}>
-          <PenIcon size={18} />
+          <PenIcon size={13.5} />
           Resume editing
         </button>
       ) : (
@@ -66,7 +66,7 @@ export function FeedbackCard({ s, c, detail }: Props) {
       ? `You've changed the board since snapshot ${snapshot.sequence}. Mark ready again to send the new version.`
       : '';
   const style =
-    !s.narrow && s.prefs.hand === 'left' ? { right: 'calc(84px + var(--sar))' } : undefined;
+    !s.narrow && s.prefs.hand === 'left' ? { right: 'calc(63px + var(--sar))' } : undefined;
   return (
     <div
       className={`fb ${verdictClass(shown, detail)}`}

@@ -1,7 +1,7 @@
 /* InkLoop design language (Paper): one set of tokens for the board and the account pages.
    Components only use the tokens.
-   Sizes in components are written at full scale; the board's chrome and the account cards are both
-   drawn at --chrome-scale, so a button is the same size everywhere. */
+   Sizes are written as drawn (no zoom or scale): the board's chrome and the account cards share
+   them, so a button is the same size everywhere. */
 
 :root {
   /* Paper: the approved canvas POC. Warm paper, dot grid, teal ink (#216A63, the brand green). */
@@ -39,16 +39,15 @@
   --bad-line: #f0cfc7;
   --bad-ink: #8a2a1b;
   --bad-note: #6e2416;
-  --sh1: 0 1px 2px rgba(17, 24, 39, 0.05), 0 6px 18px rgba(17, 24, 39, 0.07);
-  --sh2: 0 2px 4px rgba(17, 24, 39, 0.05), 0 16px 40px rgba(17, 24, 39, 0.12);
+  --sh1: 0 0.75px 1.5px rgba(17, 24, 39, 0.05), 0 4.5px 13.5px rgba(17, 24, 39, 0.07);
+  --sh2: 0 1.5px 3px rgba(17, 24, 39, 0.05), 0 12px 30px rgba(17, 24, 39, 0.12);
   --ui: Inter, -apple-system, 'SF Pro Text', system-ui, sans-serif;
   --q: 'STIX Two Text', 'Times New Roman', Times, serif;
-  --r-s: 10px;
-  --r-m: 12px;
-  --r-l: 16px;
-  --r-xl: 20px;
+  --r-s: 7.5px;
+  --r-m: 9px;
+  --r-l: 12px;
+  --r-xl: 15px;
   --w-strong: 600;
-  --chrome-scale: 0.75;
 }
 
 :root {
@@ -56,7 +55,7 @@
   --sab: env(safe-area-inset-bottom, 0px);
   --sal: env(safe-area-inset-left, 0px);
   --sar: env(safe-area-inset-right, 0px);
-  --row2: calc(72px + var(--sat));
+  --row2: calc(54px + var(--sat));
   color-scheme: light;
 }
 
@@ -85,45 +84,44 @@ body:has(.auth-page) {
   box-sizing: border-box;
 }
 .auth-card {
-  zoom: var(--chrome-scale);
-  width: min(600px, calc((100vw - 32px) / var(--chrome-scale)));
-  padding: 30px 36px 32px;
+  width: min(450px, calc(100vw - 32px));
+  padding: 22.5px 27px 24px;
   background: var(--surface);
-  border: 1px solid var(--line);
+  border: 0.75px solid var(--line);
   border-radius: var(--r-xl);
   box-shadow: var(--sh2);
-  font-size: 17px;
+  font-size: 12.75px;
   line-height: 1.55;
 }
 .auth-card .brand {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
-  font-size: 15px;
+  gap: 7.5px;
+  font-size: 11.25px;
   font-weight: var(--w-strong);
   color: var(--muted);
   text-decoration: none;
   letter-spacing: 0.01em;
 }
 .auth-card .brand img {
-  width: 26px;
-  height: 26px;
-  border-radius: 7px;
+  width: 19.5px;
+  height: 19.5px;
+  border-radius: 5.25px;
 }
 .auth-card h1 {
-  margin: 22px 0 10px;
-  font-size: 30px;
+  margin: 16.5px 0 7.5px;
+  font-size: 22.5px;
   line-height: 1.2;
   font-weight: 650;
   letter-spacing: -0.01em;
 }
 .auth-card h2 {
-  margin: 0 0 6px;
-  font-size: 17px;
+  margin: 0 0 4.5px;
+  font-size: 12.75px;
   font-weight: var(--w-strong);
 }
 .auth-card p {
-  margin: 0 0 14px;
+  margin: 0 0 10.5px;
   color: var(--ink-2);
   overflow-wrap: anywhere;
 }
@@ -138,14 +136,14 @@ body:has(.auth-page) {
     Menlo,
     monospace;
   background: var(--soft);
-  border-radius: 6px;
-  padding: 2px 6px;
+  border-radius: 4.5px;
+  padding: 1.5px 4.5px;
   overflow-wrap: anywhere;
 }
 .auth-card label {
   display: block;
-  margin: 18px 0;
-  font-size: 15px;
+  margin: 13.5px 0;
+  font-size: 11.25px;
   font-weight: var(--w-strong);
   color: var(--ink-2);
 }
@@ -153,14 +151,14 @@ body:has(.auth-page) {
 .auth-card input[type='text'] {
   display: block;
   width: 100%;
-  height: 50px;
-  margin-top: 8px;
-  padding: 0 16px;
-  border: 1px solid var(--line);
+  height: 37.5px;
+  margin-top: 6px;
+  padding: 0 12px;
+  border: 0.75px solid var(--line);
   border-radius: var(--r-m);
   background: var(--surface);
   color: var(--ink);
-  font: 400 17px var(--ui);
+  font: 400 12.75px var(--ui);
   outline: none;
 }
 .auth-card input[hidden] {
@@ -168,29 +166,29 @@ body:has(.auth-page) {
 }
 .auth-card input:focus-visible {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-soft);
+  box-shadow: 0 0 0 2.25px var(--accent-soft);
 }
 .auth-card .check {
   display: flex;
   align-items: flex-start;
-  gap: 12px;
-  min-height: 44px;
+  gap: 9px;
+  min-height: 33px;
   font-weight: 400;
   color: var(--ink);
 }
 .auth-card .check input {
   flex: none;
-  width: 20px;
-  height: 20px;
-  margin: 3px 0 0;
+  width: 15px;
+  height: 15px;
+  margin: 2.25px 0 0;
   accent-color: var(--accent);
 }
 .auth-card .check code {
   font-size: 0.82em;
 }
 .auth-card .hint {
-  margin: -8px 0 18px;
-  font-size: 14px;
+  margin: -6px 0 13.5px;
+  font-size: 10.5px;
   color: var(--muted);
 }
 .auth-card button,
@@ -198,14 +196,14 @@ body:has(.auth-page) {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  min-height: 50px;
-  padding: 0 22px;
-  border: 1px solid var(--accent);
+  gap: 6px;
+  min-height: 37.5px;
+  padding: 0 16.5px;
+  border: 0.75px solid var(--accent);
   border-radius: var(--r-m);
   background: var(--accent);
   color: var(--on-accent);
-  font: var(--w-strong) 17px var(--ui);
+  font: var(--w-strong) 12.75px var(--ui);
   text-decoration: none;
   cursor: pointer;
 }
@@ -216,9 +214,9 @@ body:has(.auth-page) {
   color: var(--ink);
 }
 .auth-card button.small {
-  min-height: 38px;
-  padding: 0 14px;
-  font-size: 15px;
+  min-height: 28.5px;
+  padding: 0 10.5px;
+  font-size: 11.25px;
 }
 .auth-card button:disabled {
   opacity: 0.55;
@@ -226,38 +224,38 @@ body:has(.auth-page) {
 }
 .auth-card button:focus-visible,
 .auth-card a:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
+  outline: 1.5px solid var(--accent);
+  outline-offset: 1.5px;
 }
 .auth-card form > button {
   width: 100%;
-  margin-top: 6px;
+  margin-top: 4.5px;
 }
 .auth-card .actions {
   display: flex;
-  gap: 12px;
-  margin-top: 8px;
+  gap: 9px;
+  margin-top: 6px;
 }
 .auth-card .actions button {
   flex: 1;
 }
 .auth-card [role='status'] {
   min-height: 1.5em;
-  margin: 14px 0 0;
+  margin: 10.5px 0 0;
   color: var(--muted);
 }
 .auth-card .foot {
-  margin: 18px 0 0;
-  padding-top: 16px;
-  border-top: 1px solid var(--line-soft);
-  font-size: 15px;
+  margin: 13.5px 0 0;
+  padding-top: 12px;
+  border-top: 0.75px solid var(--line-soft);
+  font-size: 11.25px;
   color: var(--muted);
 }
 .auth-card ul.rows {
   list-style: none;
-  margin: 8px 0 0;
+  margin: 6px 0 0;
   padding: 0;
-  border: 1px solid var(--line);
+  border: 0.75px solid var(--line);
   border-radius: var(--r-l);
   overflow: hidden;
 }
@@ -265,9 +263,9 @@ body:has(.auth-page) {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
-  padding: 14px 16px;
-  border-top: 1px solid var(--line-soft);
+  gap: 12px;
+  padding: 10.5px 12px;
+  border-top: 0.75px solid var(--line-soft);
 }
 .auth-card ul.rows li:first-child {
   border-top: 0;
@@ -278,74 +276,74 @@ body:has(.auth-page) {
 .auth-card ul.rows small {
   display: block;
   color: var(--muted);
-  font-size: 14px;
+  font-size: 10.5px;
 }
 .auth-card .facts {
-  margin: 0 0 16px;
-  padding: 14px 16px;
+  margin: 0 0 12px;
+  padding: 10.5px 12px;
   border-radius: var(--r-l);
   background: var(--soft);
-  font-size: 16px;
+  font-size: 12px;
 }
 .auth-card .facts p {
   margin: 0;
 }
 .auth-card .facts p + p {
-  margin-top: 6px;
+  margin-top: 4.5px;
 }
 
 /* numbered setup steps */
 .auth-card ol.steps {
   list-style: none;
   counter-reset: step;
-  margin: 18px 0 4px;
+  margin: 13.5px 0 3px;
   padding: 0;
 }
 .auth-card ol.steps > li {
   counter-increment: step;
   position: relative;
-  padding: 0 0 18px 46px;
+  padding: 0 0 13.5px 34.5px;
 }
 .auth-card ol.steps > li::before {
   content: counter(step);
   position: absolute;
   left: 0;
   top: 0;
-  width: 30px;
-  height: 30px;
+  width: 22.5px;
+  height: 22.5px;
   border-radius: 50%;
   display: grid;
   place-items: center;
   background: var(--accent-soft);
   color: var(--accent);
   font-weight: 700;
-  font-size: 15px;
+  font-size: 11.25px;
 }
 .auth-card ol.steps > li::after {
   content: '';
   position: absolute;
-  left: 14.5px;
-  top: 36px;
-  bottom: 6px;
-  width: 1px;
+  left: 10.88px;
+  top: 27px;
+  bottom: 4.5px;
+  width: 0.75px;
   background: var(--line);
 }
 .auth-card ol.steps > li:last-child::after {
   display: none;
 }
 .auth-card ol.steps h2 {
-  padding-top: 3px;
+  padding-top: 2.25px;
 }
 .auth-card ol.steps label {
-  margin: 10px 0 0;
+  margin: 7.5px 0 0;
 }
 
 /* a value with a copy button (MCP URL, SQL) */
 .copy-row {
   display: flex;
   align-items: stretch;
-  gap: 8px;
-  margin: 8px 0 4px;
+  gap: 6px;
+  margin: 6px 0 3px;
 }
 .copy-row code,
 .auth-card .copy-row code {
@@ -353,12 +351,12 @@ body:has(.auth-page) {
   min-width: 0;
   display: flex;
   align-items: center;
-  padding: 10px 14px;
-  border: 1px solid var(--line);
+  padding: 7.5px 10.5px;
+  border: 0.75px solid var(--line);
   border-radius: var(--r-m);
   background: var(--soft);
   font:
-    15px ui-monospace,
+    11.25px ui-monospace,
     'SF Mono',
     Menlo,
     monospace;
@@ -368,9 +366,9 @@ body:has(.auth-page) {
 }
 .auth-card .copy-row button {
   flex: none;
-  min-height: 44px;
-  padding: 0 16px;
-  font-size: 15px;
+  min-height: 33px;
+  padding: 0 12px;
+  font-size: 11.25px;
   background: var(--surface);
   border-color: var(--line);
   color: var(--ink);

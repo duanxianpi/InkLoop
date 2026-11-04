@@ -12,7 +12,7 @@
 }
 .app {
   font-family: var(--ui);
-  font-size: 15px;
+  font-size: 11.25px;
   color: var(--ink);
   background: var(--board);
   -webkit-text-size-adjust: 100%;
@@ -33,8 +33,8 @@
   margin: 0;
 }
 .app button:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
+  outline: 1.5px solid var(--accent);
+  outline-offset: 1.5px;
 }
 .app {
   position: fixed;
@@ -59,18 +59,19 @@
   width: 0;
   height: 0;
 }
+.paper {
+  --z: 1;
+}
 #engine {
   position: absolute;
   inset: 0;
   touch-action: none;
 }
-/* All chrome is drawn at --chrome-scale (set by the design language; the POC used 75%). It is
-   zoomed rather than transformed: a scale transform rasterises text and math at full size and
-   shrinks the bitmap, which blurs them (WebKit especially). Raise the scale for larger targets. */
+/* Chrome sizes are the drawn sizes (the POC's 75%), never zoomed or scaled: a scale transform blurs
+   text and math, and WebKit's zoom shrinks boxes without shrinking their text. */
 .chrome {
   position: absolute;
   inset: 0;
-  zoom: var(--chrome-scale);
   pointer-events: none;
   z-index: 400;
 }
@@ -79,12 +80,12 @@
 }
 .float {
   background: var(--surface);
-  border: 1px solid var(--line);
+  border: 0.75px solid var(--line);
   box-shadow: var(--sh1);
 }
 .ib {
-  width: 44px;
-  height: 44px;
+  width: 33px;
+  height: 33px;
   border: 0;
   border-radius: var(--r-m);
   background: transparent;
@@ -99,42 +100,55 @@
   cursor: default;
 }
 
-/* question: printed tile on the board; peek + popped card in the tile's home position when it scrolls away */
+/* question: printed tile on the board; peek + popped card in the tile's home position when it scrolls away.
+   The tile follows the camera by laying itself out at the camera's zoom --z (set on .paper): every
+   length, font sizes included, is its size at zoom 1 times --z, so text is typeset at its real size. */
 .qtile {
   position: absolute;
   left: 0;
-  bottom: 30px;
-  width: 480px;
-  padding: 14px 18px 15px;
+  bottom: calc(30px * var(--z));
+  width: calc(480px * var(--z));
+  padding: calc(14px * var(--z)) calc(18px * var(--z)) calc(15px * var(--z));
   background: var(--surface);
-  border: 1px solid var(--tile-line);
-  border-radius: var(--r-m);
+  border: calc(1px * var(--z)) solid var(--tile-line);
+  border-radius: calc(12px * var(--z));
 }
 .qtile .qmeta {
-  font-size: 9.5px;
-  gap: 6px;
+  font-size: calc(9.5px * var(--z));
+  gap: calc(6px * var(--z));
+}
+.qtile .qmeta i {
+  width: calc(3px * var(--z));
+  height: calc(3px * var(--z));
 }
 .qtile .qbody {
-  font-size: 15px;
-  margin-top: 7px;
+  font-size: calc(15px * var(--z));
+  margin-top: calc(7px * var(--z));
+}
+.qtile .qfig {
+  margin-top: calc(12px * var(--z));
 }
 .qtile .qfig svg {
-  width: 225px;
+  width: calc(225px * var(--z));
+}
+.qtile .md code {
+  padding: calc(1px * var(--z)) calc(4px * var(--z));
+  border-radius: calc(4px * var(--z));
 }
 .qmeta {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   min-width: 0;
-  font-size: 12px;
+  font-size: 9px;
   font-weight: 600;
   letter-spacing: 0.07em;
   text-transform: uppercase;
   color: var(--muted);
 }
 .qmeta i {
-  width: 3px;
-  height: 3px;
+  width: 2.25px;
+  height: 2.25px;
   border-radius: 50%;
   background: var(--faint);
   flex: none;
@@ -146,9 +160,9 @@
 }
 .qbody {
   font-family: var(--q);
-  font-size: 20px;
+  font-size: 15px;
   line-height: 1.55;
-  margin-top: 10px;
+  margin-top: 7.5px;
 }
 .qbody mjx-container[display='true'] {
   margin: 0.5em 0 !important;
@@ -162,7 +176,7 @@
   font-weight: 600;
 }
 .qfig {
-  margin-top: 12px;
+  margin-top: 9px;
   display: flex;
   justify-content: center;
 }
@@ -178,8 +192,8 @@
   transform: translateY(-50%);
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  padding: 4px;
+  gap: 1.5px;
+  padding: 3px;
   border-radius: var(--r-xl);
   /* Above the unfolded question; it fades while the question is being read. */
   z-index: 1;
@@ -189,16 +203,16 @@
   opacity: 0.3;
 }
 .rail.left {
-  left: calc(16px + var(--sal));
+  left: calc(12px + var(--sal));
 }
 .rail.right {
-  right: calc(16px + var(--sar));
+  right: calc(12px + var(--sar));
 }
 .rail .sep {
-  width: 24px;
-  height: 1px;
+  width: 18px;
+  height: 0.75px;
   background: var(--tile-line);
-  margin: 4px auto;
+  margin: 3px auto;
   flex: none;
 }
 .rail .ib[aria-pressed='true'] {
@@ -211,20 +225,20 @@
 .rail.h {
   position: absolute;
   top: auto;
-  left: calc(12px + var(--sal));
-  bottom: calc(12px + var(--sab));
+  left: calc(9px + var(--sal));
+  bottom: calc(9px + var(--sab));
   transform: none;
   flex-direction: row;
-  padding: 3px;
+  padding: 2.25px;
   border-radius: var(--r-l);
 }
 .rail.h .sep {
-  width: 1px;
-  height: 24px;
-  margin: auto 4px;
+  width: 0.75px;
+  height: 18px;
+  margin: auto 3px;
 }
 .rail.h .ib {
-  width: 40px;
+  width: 30px;
 }
 
 /* top-left: navigation */
@@ -232,8 +246,8 @@
    opens the overview there, the question unfolds its statement inside the bar */
 .qbar {
   position: relative;
-  flex: 0 1 660px;
-  min-width: 200px;
+  flex: 0 1 495px;
+  min-width: 150px;
   max-height: 100%;
   border-radius: var(--r-l);
   display: flex;
@@ -248,37 +262,37 @@
 .qrow {
   display: flex;
   align-items: center;
-  height: 46px;
-  padding: 0 2px 2px;
+  height: 34.5px;
+  padding: 0 1.5px 1.5px;
   flex: none;
 }
 .qrow .ib {
-  width: 44px;
-  height: 42px;
+  width: 33px;
+  height: 31.5px;
 }
 .qrow .ovb {
   color: var(--muted);
 }
 .qrow .vsep {
-  width: 1px;
-  height: 24px;
+  width: 0.75px;
+  height: 18px;
   background: var(--tile-line);
-  margin: 0 4px;
+  margin: 0 3px;
   flex: none;
 }
 .qttl {
   flex: 1;
   min-width: 0;
-  height: 42px;
-  padding: 0 2px;
+  height: 31.5px;
+  padding: 0 1.5px;
   display: flex;
   align-items: center;
-  gap: 2px;
-  font: 500 15px var(--ui);
+  gap: 1.5px;
+  font: 500 11.25px var(--ui);
 }
 .qttl .lv {
-  height: 34px;
-  padding: 0 6px;
+  height: 25.5px;
+  padding: 0 4.5px;
   border: 0;
   border-radius: var(--r-s);
   background: transparent;
@@ -288,7 +302,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   flex: 0 1 auto;
-  min-width: 24px;
+  min-width: 18px;
 }
 /* When space runs out the collection gives way first; set and batch stay readable. */
 .qttl .coll {
@@ -310,8 +324,8 @@
 }
 .qttl .qt {
   /* Same weight and colour as the levels: the bar reads as one line, not two levels. */
-  min-width: 80px;
-  margin-left: 4px;
+  min-width: 60px;
+  margin-left: 3px;
 }
 /* expand/collapse affordance: a small grip on the bar's bottom edge instead of another arrow */
 .grip {
@@ -319,30 +333,30 @@
   left: 0;
   right: 0;
   bottom: 0;
-  height: 12px;
+  height: 9px;
   border: 0;
   padding: 0;
   background: transparent;
   display: grid;
   place-items: end center;
-  padding-bottom: 4px;
+  padding-bottom: 3px;
 }
 .grip::after {
   content: '';
-  width: 28px;
-  height: 3px;
-  border-radius: 2px;
+  width: 21px;
+  height: 2.25px;
+  border-radius: 1.5px;
   background: var(--track);
 }
 .qbar.open .grip {
   position: static;
-  height: 16px;
+  height: 12px;
   flex: none;
   place-items: center;
   padding: 0;
 }
 .qbar.open .grip::after {
-  width: 36px;
+  width: 27px;
 }
 /* the statement slides open: a grid row animated from 0fr to 1fr */
 .qwrap {
@@ -374,8 +388,8 @@
   -webkit-overflow-scrolling: touch;
 }
 .qbar .qb > .qbody {
-  border-top: 1px solid var(--line-soft);
-  padding: 16px 24px 20px;
+  border-top: 0.75px solid var(--line-soft);
+  padding: 12px 18px 15px;
 }
 @media (prefers-reduced-motion: reduce) {
   .qwrap,
@@ -388,25 +402,25 @@
 }
 .toprow {
   position: absolute;
-  left: calc(16px + var(--sal));
-  right: calc(16px + var(--sar));
-  top: calc(16px + var(--sat));
-  bottom: calc(16px + var(--sab));
+  left: calc(12px + var(--sal));
+  right: calc(12px + var(--sar));
+  top: calc(12px + var(--sat));
+  bottom: calc(12px + var(--sab));
   display: flex;
   align-items: flex-start;
-  gap: 8px;
+  gap: 6px;
   pointer-events: none;
 }
 .toprow > * {
   pointer-events: auto;
 }
 .narrow .toprow {
-  left: calc(8px + var(--sal));
-  right: calc(8px + var(--sar));
-  top: calc(8px + var(--sat));
+  left: calc(6px + var(--sal));
+  right: calc(6px + var(--sar));
+  top: calc(6px + var(--sat));
 }
 .narrow .qrow .ib {
-  width: 38px;
+  width: 28.5px;
 }
 .narrow .qttl {
   padding: 0;
@@ -424,33 +438,33 @@
   margin-left: auto;
   flex: none;
   display: flex;
-  gap: 8px;
+  gap: 6px;
 }
 /* Finished is a checkbox-style toggle: off = plain white with an empty circle, on = filled (same blue as
    "Finished, waiting" in the overview). Dark fill is reserved for the active tool in the rail. */
 .fin {
-  height: 44px;
-  padding: 0 18px 0 13px;
+  height: 33px;
+  padding: 0 13.5px 0 9.75px;
   border-radius: var(--r-m);
-  border: 1px solid var(--line);
+  border: 0.75px solid var(--line);
   background: var(--surface);
   color: var(--ink);
-  font: 600 15px var(--ui);
+  font: 600 11.25px var(--ui);
   box-shadow: var(--sh1);
   white-space: nowrap;
   display: inline-flex;
   align-items: center;
-  gap: 9px;
+  gap: 6.75px;
 }
 .fin svg {
   color: var(--muted);
   flex: none;
 }
 .fin .box {
-  width: 18px;
-  height: 18px;
+  width: 13.5px;
+  height: 13.5px;
   border-radius: 50%;
-  border: 1.7px solid var(--faint);
+  border: 1.27px solid var(--faint);
   display: grid;
   place-items: center;
   flex: none;
@@ -486,8 +500,8 @@
   color: var(--off);
 }
 .fin .dv {
-  width: 1px;
-  height: 18px;
+  width: 0.75px;
+  height: 13.5px;
   background: rgba(255, 255, 255, 0.45);
   flex: none;
 }
@@ -499,23 +513,23 @@
   border-color: var(--track);
 }
 .fbb {
-  height: 44px;
-  padding: 0 14px;
+  height: 33px;
+  padding: 0 10.5px;
   border-radius: var(--r-m);
-  border: 1px solid var(--vl);
+  border: 0.75px solid var(--vl);
   background: var(--vs);
   color: var(--v);
   box-shadow: var(--sh1);
   display: inline-flex;
   align-items: center;
-  gap: 7px;
-  font: 700 17px var(--ui);
+  gap: 5.25px;
+  font: 700 12.75px var(--ui);
 }
 .fbb[aria-expanded='true'] {
-  box-shadow: inset 0 0 0 1.5px var(--v);
+  box-shadow: inset 0 0 0 1.13px var(--v);
 }
 .narrow .fbb {
-  padding: 0 12px;
+  padding: 0 9px;
 }
 .v-correct {
   --v: var(--ok);
@@ -550,37 +564,37 @@
 /* status line: saved time + answer state, bottom corner on the tool-rail side (away from the writing hand) */
 .status {
   position: absolute;
-  bottom: calc(14px + var(--sab));
+  bottom: calc(10.5px + var(--sab));
   display: flex;
   align-items: center;
-  gap: 16px;
-  font-size: 13px;
+  gap: 12px;
+  font-size: 9.75px;
   pointer-events: none;
 }
 .status.left {
-  left: calc(16px + var(--sal));
+  left: calc(12px + var(--sal));
 }
 .status.right {
-  right: calc(150px + var(--sar));
+  right: calc(112.5px + var(--sar));
 }
 .narrow .status {
-  left: calc(12px + var(--sal));
+  left: calc(9px + var(--sal));
   right: auto;
-  bottom: calc(70px + var(--sab));
+  bottom: calc(52.5px + var(--sab));
   flex-direction: column;
   align-items: flex-start;
-  gap: 4px;
+  gap: 3px;
 }
 .si {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
+  gap: 5.25px;
   white-space: nowrap;
 }
 .si::before {
   content: '';
-  width: 7px;
-  height: 7px;
+  width: 5.25px;
+  height: 5.25px;
   border-radius: 50%;
   background: currentColor;
 }
@@ -600,13 +614,13 @@
 }
 .hint {
   position: absolute;
-  top: calc(68px + var(--sat));
-  right: calc(16px + var(--sar));
-  padding: 8px 12px;
+  top: calc(51px + var(--sat));
+  right: calc(12px + var(--sar));
+  padding: 6px 9px;
   border-radius: var(--r-s);
   background: var(--ink);
   color: var(--on-accent);
-  font-size: 13px;
+  font-size: 9.75px;
   pointer-events: none;
   animation: fade 2.4s forwards;
 }
@@ -615,53 +629,53 @@
 .fb {
   position: absolute;
   top: var(--row2);
-  right: calc(16px + var(--sar));
-  width: 400px;
-  max-height: calc(100% - 88px - var(--sat) - var(--sab));
+  right: calc(12px + var(--sar));
+  width: 300px;
+  max-height: calc(100% - 66px - var(--sat) - var(--sab));
   border-radius: var(--r-xl);
   overflow: hidden;
   background: var(--surface);
-  border: 1px solid var(--line);
+  border: 0.75px solid var(--line);
   box-shadow: var(--sh2);
   display: flex;
   flex-direction: column;
 }
 .narrow .fb {
-  left: calc(8px + var(--sal));
-  right: calc(8px + var(--sar));
+  left: calc(6px + var(--sal));
+  right: calc(6px + var(--sar));
   width: auto;
-  top: calc(64px + var(--sat));
+  top: calc(48px + var(--sat));
 }
 .fbhead {
   display: flex;
   align-items: center;
-  gap: 10px;
-  height: 52px;
-  padding: 0 6px 0 18px;
+  gap: 7.5px;
+  height: 39px;
+  padding: 0 4.5px 0 13.5px;
   background: var(--vs);
   color: var(--vi);
   flex: none;
 }
 .fbhead b {
-  font-size: 17px;
+  font-size: 12.75px;
   color: var(--v);
 }
 .fbhead .fl {
-  font-size: 15px;
+  font-size: 11.25px;
   font-weight: 600;
   flex: 1;
 }
 .fbhead .ib {
-  width: 40px;
-  height: 40px;
+  width: 30px;
+  height: 30px;
   color: var(--vi);
 }
 .fbbody {
-  padding: 16px 20px 14px;
+  padding: 12px 15px 10.5px;
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  font-size: 15px;
+  gap: 10.5px;
+  font-size: 11.25px;
   line-height: 1.55;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
@@ -673,10 +687,10 @@
 }
 .co {
   border-radius: var(--r-m);
-  padding: 12px 14px;
+  padding: 9px 10.5px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4.5px;
 }
 .co.ok {
   background: var(--ok-soft);
@@ -692,7 +706,7 @@
 }
 .co .cq {
   font-family: var(--q);
-  font-size: 17px;
+  font-size: 12.75px;
   overflow-x: auto;
   overflow-y: hidden;
 }
@@ -701,28 +715,28 @@
   text-align: left !important;
 }
 .co .cn {
-  font-size: 14px;
+  font-size: 10.5px;
   color: var(--n);
 }
 .when {
   align-self: flex-end;
-  font-size: 12px;
+  font-size: 9px;
   color: var(--faint);
 }
 .fbnote {
-  font-size: 13.5px;
+  font-size: 10.13px;
   line-height: 1.45;
   color: var(--ink-2);
   background: var(--soft);
   border-radius: var(--r-s);
-  padding: 9px 12px;
+  padding: 6.75px 9px;
 }
 .fbfoot {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
-  font-size: 12.5px;
+  gap: 7.5px;
+  font-size: 9.38px;
   color: var(--faint);
 }
 .fbfoot span:first-child {
@@ -731,27 +745,27 @@
 .fbfoot button {
   border: 0;
   background: transparent;
-  padding: 6px 0;
-  font: 500 12.5px var(--ui);
+  padding: 4.5px 0;
+  font: 500 9.38px var(--ui);
   color: var(--accent);
 }
 .snapimg {
   display: block;
   width: 100%;
   border-radius: var(--r-s);
-  box-shadow: 0 0 0 1px var(--line);
+  box-shadow: 0 0 0 0.75px var(--line);
   background: var(--surface);
 }
 .fbhist {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  border-top: 1px solid var(--line-soft);
-  padding-top: 10px;
+  gap: 1.5px;
+  border-top: 0.75px solid var(--line-soft);
+  padding-top: 7.5px;
 }
 .fbhist h4 {
-  margin: 0 0 4px;
-  font-size: 11px;
+  margin: 0 0 3px;
+  font-size: 8.25px;
   font-weight: 700;
   letter-spacing: 0.07em;
   text-transform: uppercase;
@@ -760,25 +774,25 @@
 .fbhist button {
   display: flex;
   align-items: center;
-  gap: 10px;
-  height: 38px;
-  padding: 0 8px;
+  gap: 7.5px;
+  height: 28.5px;
+  padding: 0 6px;
   border: 0;
   border-radius: var(--r-s);
   background: transparent;
-  font: 500 14px var(--ui);
+  font: 500 10.5px var(--ui);
   text-align: left;
 }
 .fbhist button[aria-pressed='true'] {
   background: var(--soft);
 }
 .fbhist .hs {
-  width: 22px;
-  height: 22px;
+  width: 16.5px;
+  height: 16.5px;
   border-radius: 50%;
   display: grid;
   place-items: center;
-  font: 700 12px var(--ui);
+  font: 700 9px var(--ui);
   background: var(--vs);
   color: var(--v);
   flex: none;
@@ -786,44 +800,44 @@
 .fbhist .hm {
   margin-left: auto;
   color: var(--faint);
-  font-size: 13px;
+  font-size: 9.75px;
 }
 /* pen colour */
 .rail .colb i {
-  width: 18px;
-  height: 18px;
+  width: 13.5px;
+  height: 13.5px;
   border-radius: 50%;
   box-shadow:
-    0 0 0 2px var(--surface),
-    0 0 0 3.5px var(--line);
+    0 0 0 1.5px var(--surface),
+    0 0 0 2.63px var(--line);
 }
 .rail .colb:disabled i {
   opacity: 0.35;
 }
 .cpop {
   position: absolute;
-  left: calc(100% + 14px);
-  top: 96px;
+  left: calc(100% + 10.5px);
+  top: 72px;
   display: flex;
-  gap: 4px;
-  padding: 6px;
+  gap: 3px;
+  padding: 4.5px;
   border-radius: var(--r-l);
   background: var(--surface);
-  border: 1px solid var(--line);
+  border: 0.75px solid var(--line);
   box-shadow: var(--sh2);
 }
 .rail.right .cpop {
   left: auto;
-  right: calc(100% + 14px);
+  right: calc(100% + 10.5px);
 }
 .rail.h .cpop {
-  left: 88px;
+  left: 66px;
   top: auto;
-  bottom: calc(100% + 10px);
+  bottom: calc(100% + 7.5px);
 }
 .cpop button {
-  width: 44px;
-  height: 44px;
+  width: 33px;
+  height: 33px;
   border: 0;
   border-radius: var(--r-m);
   background: transparent;
@@ -834,8 +848,8 @@
   background: var(--empty);
 }
 .cpop i {
-  width: 22px;
-  height: 22px;
+  width: 16.5px;
+  height: 16.5px;
   border-radius: 50%;
 }
 
@@ -852,12 +866,12 @@
 .sheet {
   position: absolute;
   z-index: 2;
-  left: calc(16px + var(--sal));
+  left: calc(12px + var(--sal));
   top: var(--row2);
-  width: min(660px, calc(100% - 32px));
-  max-height: min(560px, calc(100% - 88px - var(--sat) - var(--sab)));
+  width: min(495px, calc(100% - 24px));
+  max-height: min(420px, calc(100% - 66px - var(--sat) - var(--sab)));
   background: var(--surface);
-  border: 1px solid var(--line);
+  border: 0.75px solid var(--line);
   border-radius: var(--r-xl);
   box-shadow: var(--sh2);
   display: flex;
@@ -865,30 +879,30 @@
   overflow: hidden;
 }
 .narrow .sheet {
-  left: calc(8px + var(--sal));
-  width: calc(100% - 16px);
-  top: calc(64px + var(--sat));
-  max-height: calc(100% - 76px);
+  left: calc(6px + var(--sal));
+  width: calc(100% - 12px);
+  top: calc(48px + var(--sat));
+  max-height: calc(100% - 57px);
 }
 .shead {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
-  padding: 8px 12px 0 12px;
+  gap: 12px;
+  padding: 6px 9px 0 9px;
   position: relative;
   flex: none;
 }
 .coll {
-  height: 48px;
-  padding: 0 12px;
+  height: 36px;
+  padding: 0 9px;
   border: 0;
   border-radius: var(--r-m);
   background: transparent;
   display: flex;
   align-items: center;
-  gap: 8px;
-  font: 600 15px var(--ui);
+  gap: 6px;
+  font: 600 11.25px var(--ui);
   min-width: 0;
   text-align: left;
 }
@@ -899,38 +913,38 @@
 }
 .collmenu {
   position: absolute;
-  left: 12px;
-  top: 56px;
+  left: 9px;
+  top: 42px;
   z-index: 5;
-  min-width: 280px;
-  padding: 6px;
+  min-width: 210px;
+  padding: 4.5px;
   border-radius: var(--r-l);
   background: var(--surface);
-  border: 1px solid var(--line);
+  border: 0.75px solid var(--line);
   box-shadow: var(--sh2);
   display: flex;
   flex-direction: column;
 }
 .collmenu button {
-  height: 44px;
-  padding: 0 12px;
+  height: 33px;
+  padding: 0 9px;
   border: 0;
   border-radius: var(--r-s);
   background: transparent;
   text-align: left;
-  font: 500 15px var(--ui);
+  font: 500 11.25px var(--ui);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 9px;
 }
 .collmenu button[aria-pressed='true'] {
   font-weight: 700;
 }
 .weeks {
   display: flex;
-  gap: 8px;
-  padding: 6px 24px 4px;
+  gap: 6px;
+  padding: 4.5px 18px 3px;
   overflow-x: auto;
   scrollbar-width: none;
   flex: none;
@@ -939,12 +953,12 @@
   display: none;
 }
 .week {
-  height: 40px;
-  padding: 0 14px;
-  border-radius: 999px;
-  border: 1px solid var(--line);
+  height: 30px;
+  padding: 0 10.5px;
+  border-radius: 749.25px;
+  border: 0.75px solid var(--line);
   background: var(--surface);
-  font: 500 13px var(--ui);
+  font: 500 9.75px var(--ui);
   flex: none;
   white-space: nowrap;
 }
@@ -960,23 +974,23 @@
   -webkit-overflow-scrolling: touch;
   display: flex;
   flex-direction: column;
-  gap: 18px;
-  padding: 16px 24px 20px;
+  gap: 13.5px;
+  padding: 12px 18px 15px;
 }
 .sec {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 7.5px;
 }
 .sec.focus {
-  margin: -8px -12px;
-  padding: 8px 12px;
+  margin: -6px -9px;
+  padding: 6px 9px;
   border-radius: var(--r-m);
   background: var(--soft);
 }
 .sec h4 {
   margin: 0;
-  font-size: 11px;
+  font-size: 8.25px;
   font-weight: 700;
   letter-spacing: 0.07em;
   text-transform: uppercase;
@@ -985,16 +999,16 @@
 .tiles {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
-  padding-top: 4px;
+  gap: 9px;
+  padding-top: 3px;
 }
 .t {
   position: relative;
-  width: 52px;
-  height: 52px;
+  width: 39px;
+  height: 39px;
   border: 0;
   border-radius: var(--r-s);
-  font: 600 16px var(--ui);
+  font: 600 12px var(--ui);
   font-variant-numeric: tabular-nums;
   padding: 0;
 }
@@ -1004,7 +1018,7 @@
 }
 .t.progress {
   background: var(--surface);
-  box-shadow: inset 0 0 0 1.5px var(--accent);
+  box-shadow: inset 0 0 0 1.13px var(--accent);
   color: var(--accent);
 }
 .t.ready {
@@ -1024,82 +1038,82 @@
   color: var(--bad);
 }
 .t.cur {
-  outline: 2px solid var(--ink);
-  outline-offset: 2px;
+  outline: 1.5px solid var(--ink);
+  outline-offset: 1.5px;
 }
 .t .vb {
   position: absolute;
-  right: -7px;
-  top: -7px;
-  width: 20px;
-  height: 20px;
+  right: -5.25px;
+  top: -5.25px;
+  width: 15px;
+  height: 15px;
   border-radius: 50%;
   background: var(--surface);
-  font: 700 11px var(--ui);
+  font: 700 8.25px var(--ui);
   display: grid;
   place-items: center;
-  box-shadow: 0 0 0 1.5px currentColor;
+  box-shadow: 0 0 0 1.13px currentColor;
 }
 .t .nd {
   position: absolute;
-  left: -3px;
-  top: -3px;
-  width: 10px;
-  height: 10px;
+  left: -2.25px;
+  top: -2.25px;
+  width: 7.5px;
+  height: 7.5px;
   border-radius: 50%;
   background: var(--accent);
-  box-shadow: 0 0 0 2px var(--surface);
+  box-shadow: 0 0 0 1.5px var(--surface);
 }
 .legend {
   display: flex;
-  gap: 6px 16px;
+  gap: 4.5px 12px;
   flex-wrap: wrap;
-  font-size: 12px;
+  font-size: 9px;
   color: var(--muted);
-  padding: 12px 24px 14px;
-  border-top: 1px solid var(--line-soft);
+  padding: 9px 18px 10.5px;
+  border-top: 0.75px solid var(--line-soft);
   flex: none;
 }
 .legend span {
   white-space: nowrap;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 4.5px;
 }
 .legend .lgb {
   color: var(--muted);
 }
 .t .vb.arrow {
-  font-size: 13px;
+  font-size: 9.75px;
 }
 .sw {
-  width: 12px;
-  height: 12px;
-  border-radius: 3px;
+  width: 9px;
+  height: 9px;
+  border-radius: 2.25px;
   flex: none;
 }
 .sw.empty {
   background: var(--empty);
-  box-shadow: inset 0 0 0 1px var(--line);
+  box-shadow: inset 0 0 0 0.75px var(--line);
 }
 .sw.progress {
   background: var(--surface);
-  box-shadow: inset 0 0 0 1.5px var(--accent);
+  box-shadow: inset 0 0 0 1.13px var(--accent);
 }
 .sw.ready {
   background: var(--accent);
 }
 .sw.correct {
   background: var(--ok-soft);
-  box-shadow: inset 0 0 0 1px var(--ok-line);
+  box-shadow: inset 0 0 0 0.75px var(--ok-line);
 }
 .sw.partial {
   background: var(--partial-soft);
-  box-shadow: inset 0 0 0 1px var(--partial-line);
+  box-shadow: inset 0 0 0 0.75px var(--partial-line);
 }
 .sw.incorrect {
   background: var(--bad-soft);
-  box-shadow: inset 0 0 0 1px var(--bad-line);
+  box-shadow: inset 0 0 0 0.75px var(--bad-line);
 }
 
 /* settings popover */
@@ -1108,31 +1122,31 @@
 }
 .pop {
   position: absolute;
-  left: calc(100% + 14px);
+  left: calc(100% + 10.5px);
   bottom: 0;
-  width: 300px;
-  max-height: 560px;
+  width: 225px;
+  max-height: 420px;
   overflow: auto;
   border-radius: var(--r-xl);
-  padding: 16px;
+  padding: 12px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;
   background: var(--surface);
-  border: 1px solid var(--line);
+  border: 0.75px solid var(--line);
   box-shadow: var(--sh2);
 }
 .rail.right .pop {
   left: auto;
-  right: calc(100% + 14px);
+  right: calc(100% + 10.5px);
 }
 .rail.h .pop {
   left: 0;
-  bottom: calc(100% + 10px);
+  bottom: calc(100% + 7.5px);
 }
 .pop h3 {
-  margin: 0 0 2px;
-  font-size: 11px;
+  margin: 0 0 1.5px;
+  font-size: 8.25px;
   font-weight: 700;
   letter-spacing: 0.07em;
   text-transform: uppercase;
@@ -1141,10 +1155,10 @@
 .pop .grp {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4.5px;
 }
 .pop .cap {
-  font-size: 12px;
+  font-size: 9px;
   color: var(--muted);
   line-height: 1.45;
 }
@@ -1152,18 +1166,18 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
-  min-height: 40px;
+  gap: 7.5px;
+  min-height: 30px;
   border: 0;
   background: transparent;
   padding: 0;
-  font: 400 14px var(--ui);
+  font: 400 10.5px var(--ui);
   text-align: left;
 }
 .tog i {
-  width: 42px;
-  height: 26px;
-  border-radius: 13px;
+  width: 31.5px;
+  height: 19.5px;
+  border-radius: 9.75px;
   background: var(--track);
   position: relative;
   flex: none;
@@ -1171,28 +1185,28 @@
 .tog i::after {
   content: '';
   position: absolute;
-  left: 3px;
-  top: 3px;
-  width: 20px;
-  height: 20px;
+  left: 2.25px;
+  top: 2.25px;
+  width: 15px;
+  height: 15px;
   border-radius: 50%;
   background: var(--surface);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 0.75px 1.5px rgba(0, 0, 0, 0.2);
   transition: transform 0.15s;
 }
 .tog[aria-pressed='true'] i {
   background: var(--ink);
 }
 .tog[aria-pressed='true'] i::after {
-  transform: translateX(16px);
+  transform: translateX(12px);
 }
 .pbtn {
-  height: 40px;
-  padding: 0 14px;
+  height: 30px;
+  padding: 0 10.5px;
   border-radius: var(--r-s);
-  border: 1px solid var(--line);
+  border: 0.75px solid var(--line);
   background: var(--surface);
-  font: 500 14px var(--ui);
+  font: 500 10.5px var(--ui);
   text-align: left;
 }
 .pbtn:disabled {
@@ -1200,8 +1214,8 @@
 }
 /* new-problem dot in the collection menu; account links styled like the settings buttons */
 .collmenu .cdot {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
   background: var(--accent);
   flex: none;
@@ -1213,20 +1227,20 @@
 .prows {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 1.5px;
 }
 .app .prow {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  min-height: 40px;
-  padding: 0 8px;
-  margin: 0 -8px;
+  min-height: 30px;
+  padding: 0 6px;
+  margin: 0 -6px;
   border: 0;
   border-radius: var(--r-s);
   background: transparent;
   color: var(--ink-2);
-  font: 400 14px var(--ui);
+  font: 400 10.5px var(--ui);
   text-align: left;
   text-decoration: none;
 }
@@ -1236,7 +1250,7 @@
 .app a.prow::after {
   content: '›';
   color: var(--faint);
-  font-size: 17px;
+  font-size: 12.75px;
 }
 .app a.pbtn {
   display: flex;
@@ -1246,7 +1260,7 @@
 }
 .notice .pbtn {
   display: inline-flex;
-  margin: 14px auto 0;
+  margin: 10.5px auto 0;
 }
 /* save state beside the answer state; failures stay visible and offer a recovery action */
 .sv.pending {
@@ -1263,8 +1277,8 @@
   pointer-events: auto;
   border: 0;
   background: transparent;
-  padding: 4px 2px;
-  font: 600 13px var(--ui);
+  padding: 3px 1.5px;
+  font: 600 9.75px var(--ui);
   color: var(--accent);
 }
 /* empty deployment and load failures: a single card where the question bar would be */
@@ -1273,14 +1287,14 @@
   left: 50%;
   top: 40%;
   transform: translate(-50%, -50%);
-  width: min(440px, calc(100% - 32px));
-  padding: 22px 24px;
+  width: min(330px, calc(100% - 24px));
+  padding: 16.5px 18px;
   border-radius: var(--r-xl);
   text-align: center;
 }
 .notice h2 {
-  margin: 0 0 6px;
-  font-size: 17px;
+  margin: 0 0 4.5px;
+  font-size: 12.75px;
 }
 .notice p {
   margin: 0;
@@ -1288,7 +1302,7 @@
   line-height: 1.5;
 }
 .notice button {
-  margin-top: 14px;
+  margin-top: 10.5px;
 }
 /* math: MathJax inserts its own SVG stylesheet; the TeX source shows while it loads */
 .tex-src {
@@ -1304,8 +1318,8 @@
     Menlo,
     monospace;
   background: var(--soft);
-  padding: 1px 4px;
-  border-radius: 4px;
+  padding: 0.75px 3px;
+  border-radius: 3px;
 }
 .md p {
   margin: 0;
@@ -1341,13 +1355,13 @@
 /* copy rows on the board (empty-board notice) */
 .app .copy-row {
   text-align: left;
-  margin-top: 14px;
+  margin-top: 10.5px;
 }
 .app .copy-row button {
   flex: none;
-  padding: 0 14px;
-  border: 1px solid var(--line);
+  padding: 0 10.5px;
+  border: 0.75px solid var(--line);
   border-radius: var(--r-s);
   background: var(--surface);
-  font: 500 14px var(--ui);
+  font: 500 10.5px var(--ui);
 }

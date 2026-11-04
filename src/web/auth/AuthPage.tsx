@@ -366,7 +366,7 @@ function Connections() {
         then asks you to sign in here and approve it.
       </p>
       <CopyRow text={mcpUrl()} />
-      <h2 style={{ marginTop: 26 }}>Connected</h2>
+      <h2 style={{ marginTop: 19.5 }}>Connected</h2>
       <p>
         Only apps you approve can use InkLoop. Revoking one does not sign you out of the whiteboard.
       </p>

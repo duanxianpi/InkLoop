@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 // Line icons from the canvas POC: 24×24, stroked with the current text colour.
 
 function Svg({
-  size = 22,
+  size = 16.5,
   width = 1.7,
   children,
 }: {
@@ -56,7 +56,7 @@ export const RedoIcon = () => (
   </Svg>
 );
 export const SettingsIcon = () => (
-  <Svg size={21}>
+  <Svg size={15.75}>
     <path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0" />
     <circle cx="16" cy="6" r="2" />
     <circle cx="10" cy="12" r="2" />
@@ -64,14 +64,14 @@ export const SettingsIcon = () => (
   </Svg>
 );
 export const FeedbackIcon = () => (
-  <Svg size={20}>
+  <Svg size={15}>
     <path d="M21 12a8 8 0 0 1-11.6 7.1L4 20.5l1.4-4.6A8 8 0 1 1 21 12z" />
     <path d="M8.5 10.5h7" />
     <path d="M8.5 13.5h4.5" />
   </Svg>
 );
 export const GridIcon = () => (
-  <Svg size={20}>
+  <Svg size={15}>
     <rect x="4" y="4" width="6.5" height="6.5" rx="1.6" />
     <rect x="13.5" y="4" width="6.5" height="6.5" rx="1.6" />
     <rect x="4" y="13.5" width="6.5" height="6.5" rx="1.6" />
@@ -79,7 +79,7 @@ export const GridIcon = () => (
   </Svg>
 );
 export const ReadyIcon = () => (
-  <Svg size={19}>
+  <Svg size={14.25}>
     <circle cx="12" cy="12" r="8.5" />
     <path d="M8.2 12.3l2.6 2.6 5-5.2" />
   </Svg>
@@ -93,7 +93,7 @@ const CHEVRONS = {
   x: 'M6 6l12 12M18 6L6 18',
 };
 export const Chevron = ({ dir }: { dir: keyof typeof CHEVRONS }) => (
-  <Svg size={18} width={2}>
+  <Svg size={13.5} width={2}>
     <path d={CHEVRONS[dir]} />
   </Svg>
 );
