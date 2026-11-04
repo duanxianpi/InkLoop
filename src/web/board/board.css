@@ -51,13 +51,13 @@
   background-size: 28px 28px;
   pointer-events: none;
 }
-.world {
+.world,
+.paper {
   position: absolute;
   left: 0;
   top: 0;
   width: 0;
   height: 0;
-  transform-origin: 0 0;
 }
 #engine {
   position: absolute;

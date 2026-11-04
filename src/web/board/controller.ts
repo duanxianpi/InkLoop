@@ -150,7 +150,7 @@ export class BoardController {
   /** The current camera is the untouched default, so it follows the tile's measured height. */
   private defaultCamera = false;
   private tileHeight = 220;
-  private world: { world: HTMLElement; under: HTMLElement } | null = null;
+  private world: { world: HTMLElement; paper: HTMLElement; under: HTMLElement } | null = null;
   private tile: HTMLElement | null = null;
   private qrow: HTMLElement | null = null;
   private frame = 0;
@@ -300,8 +300,8 @@ export class BoardController {
 
   // ---------------------------------------------------------------- layout and camera
 
-  registerWorld(world: HTMLElement | null, under: HTMLElement | null) {
-    this.world = world && under ? { world, under } : null;
+  registerWorld(world: HTMLElement | null, paper: HTMLElement | null, under: HTMLElement | null) {
+    this.world = world && paper && under ? { world, paper, under } : null;
     if (this.engine) this.onCamera(this.engine.getCamera());
   }
   registerQuestionRow(element: HTMLElement | null) {
@@ -322,10 +322,12 @@ export class BoardController {
     cancelAnimationFrame(this.frame);
     this.frame = requestAnimationFrame(() => {
       if (this.world) {
-        const { world, under } = this.world;
+        const { world, paper, under } = this.world;
         // Whole device pixels: a fractional offset resamples the printed question and blurs it.
         const snap = (value: number) => Math.round(value * devicePixelRatio) / devicePixelRatio;
-        world.style.transform = `translate(${snap(camera.x)}px, ${snap(camera.y)}px) scale(${camera.z})`;
+        world.style.transform = `translate(${snap(camera.x)}px, ${snap(camera.y)}px)`;
+        // Zoomed, not scaled, like the chrome: a scale transform smears the question's math in WebKit.
+        paper.style.zoom = String(camera.z);
         const grid = 28 * camera.z;
         under.style.backgroundSize = `${grid}px ${grid}px`;
         under.style.backgroundPosition = `${camera.x}px ${camera.y}px`;

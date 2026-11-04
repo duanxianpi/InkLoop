@@ -91,21 +91,24 @@ function World({
 }) {
   const under = useRef<HTMLDivElement>(null);
   const world = useRef<HTMLDivElement>(null);
+  const paper = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
-    c.registerWorld(world.current, under.current);
-    return () => c.registerWorld(null, null);
+    c.registerWorld(world.current, paper.current, under.current);
+    return () => c.registerWorld(null, null, null);
   }, [c]);
   return (
     <div className="under" ref={under}>
       <div className="world" ref={world}>
-        {problem && (
-          <QuestionTile
-            c={c}
-            problem={problem}
-            detail={detail}
-            number={numberOf(problems, problem)}
-          />
-        )}
+        <div className="paper" ref={paper}>
+          {problem && (
+            <QuestionTile
+              c={c}
+              problem={problem}
+              detail={detail}
+              number={numberOf(problems, problem)}
+            />
+          )}
+        </div>
       </div>
     </div>
   );
