@@ -5,6 +5,7 @@ import { applyMigrations } from './migrations.mjs';
 import { createHash, randomBytes } from 'node:crypto';
 import { crc32, deflateSync } from 'node:zlib';
 import { build } from 'esbuild';
+import { loadSource } from './load-source.mjs';
 const require = createRequire(import.meta.url);
 const { Miniflare, convertV4MiniflareOptions } = require(
   require.resolve('miniflare', { paths: [require.resolve('wrangler/package.json')] }),
@@ -656,6 +657,50 @@ test('agents can read, edit and remove problems, sets and collections', async ()
       deleted: created.collection_id,
     });
     assert.deepEqual((await call('list_collections', {})).collections, []);
+  } finally {
+    await mf.dispose();
+  }
+});
+
+test('a canvas save that commits while problems are being deleted leaves no stored objects', async () => {
+  const { mf, db, web, mcp, bucket } = await start();
+  try {
+    const created = (
+      await mcp('create_problems', {
+        request_id: 'race-1',
+        new_set: { title: 'W1', new_collection_title: 'Course' },
+        problems: [{ title: 'Q', body: 'B' }],
+      })
+    ).structuredContent;
+    const [id] = created.problem_ids;
+    await json(await save(web, id, { base: 0, epoch: 0, fingerprint: 'f1' }));
+    // Another device saves right before the deletion batch commits.
+    let raced = false;
+    const racing = {
+      prepare: (sql) => db.prepare(sql),
+      async batch(statements) {
+        if (!raced && statements.length > 3) {
+          raced = true;
+          await json(await save(web, id, { base: 1, epoch: 0, fingerprint: 'f2' }));
+        }
+        return db.batch(statements);
+      },
+    };
+    const { organizeService } = await loadSource('src/server/services/organize.ts');
+    const organize = organizeService({ db: racing, storage: bucket, authEpoch: 1 });
+    assert.deepEqual(await organize.deleteProblems({ problem_ids: [id] }), {
+      deleted: [id],
+      not_found: [],
+    });
+    assert.equal(raced, true);
+    assert.deepEqual(await listKeys(bucket, `canvas/${id}/`), []);
+    // A save that arrives after the deletion is refused and removes its own upload.
+    assert.equal((await save(web, id, { base: 2, epoch: 0, fingerprint: 'f3' })).status, 404);
+    assert.deepEqual(await listKeys(bucket, `canvas/${id}/`), []);
+    assert.deepEqual(await organize.deleteProblems({ problem_ids: [id] }), {
+      deleted: [],
+      not_found: [id],
+    });
   } finally {
     await mf.dispose();
   }

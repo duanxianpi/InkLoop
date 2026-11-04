@@ -9,10 +9,6 @@ import {
 import { assert, json, type Env, type State } from './common';
 import type { GrantProps, McpIdentity } from './types';
 
-const SCOPE_LABELS: Record<string, string> = {
-  'mcp:write': 'Create problems and give feedback',
-};
-
 export type AuthenticatedHandler = (request: Request, owner: McpIdentity) => Promise<Response>;
 
 /** Reuse the state read for this request; no cross-request authorization cache. */
@@ -51,7 +47,7 @@ function configuration(current: State, handler?: AuthenticatedHandler): OAuthPro
             assert(
               ctx.auth.scope.includes(scope),
               403,
-              `This app was connected with read-only access (${scope} was not granted). Reconnect it and allow "${SCOPE_LABELS[scope] ?? scope}" to use this tool.`,
+              `This app was connected with read-only access (${scope} was not granted). Reconnect it and allow write access on the consent page to use this tool.`,
             );
           },
         });

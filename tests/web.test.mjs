@@ -143,6 +143,55 @@ test('a stale draft keeps its own base and surfaces as a conflict, never an over
   }
 });
 
+test('deleting the last problem clears and locks the canvas and stops its saves', async () => {
+  globalThis.innerWidth ??= 1024;
+  const { BoardController } = await loadSource('src/web/board/controller.ts');
+  const board = new BoardController();
+  const stub = stubFetch(async (request) =>
+    request.url.pathname === '/api/collections'
+      ? Response.json({ collections: [] })
+      : Response.json({ problems: [], next_cursor: null }),
+  );
+  try {
+    const loads = [];
+    board.engine = { load: (...args) => loads.push(args) };
+    const sync = new CanvasSync('p4', { revision: 1, edit_epoch: 0, fingerprint: 'f0' }, () => {});
+    sync.change(content(1)); // Unsaved ink on the problem that is about to disappear.
+    board.syncs.set('p4', sync);
+    board.set({ problems: [{ id: 'p4' }], currentId: 'p4', canvas: 'ready', hasInk: true });
+    await board.refresh();
+    assert.equal(board.state.currentId, null);
+    assert.deepEqual(loads, [[null, true]], 'the old ink is gone and nothing can be drawn');
+    assert.equal(board.state.hasInk, false);
+    assert.equal(board.syncs.has('p4'), false);
+    assert.equal(sync.unsaved, null, 'the deleted problem has nothing left to upload');
+    sync.change(content(2));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    assert.ok(!stub.requests.some((r) => r.url.pathname.endsWith('/canvas')));
+  } finally {
+    stub.restore();
+  }
+});
+
+test('a save to a deleted problem stops instead of retrying', async () => {
+  const stub = stubFetch(async () =>
+    Response.json({ error: 'not_found', message: 'Problem not found' }, { status: 404 }),
+  );
+  try {
+    const sync = new CanvasSync('p5', { revision: 0, edit_epoch: 0, fingerprint: null }, () => {});
+    sync.change(content(1));
+    await assert.rejects(sync.flush(), (error) => error.code === 'not_found');
+    assert.equal(sync.unsaved, null);
+    assert.equal(await drafts.get('p5'), null);
+    sync.retrySoon();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    assert.equal(stub.requests.length, 1);
+    sync.dispose();
+  } finally {
+    stub.restore();
+  }
+});
+
 test('untrusted Markdown renders math and text, never markup', () => {
   assert.deepEqual(tokenize('Cost \\$5, $x^2$ and $$\\int f$$ \\(a\\) \\[b\\]'), [
     { math: false, text: 'Cost $5, ' },

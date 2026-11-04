@@ -2,7 +2,7 @@ import { DomainError } from '../../shared/errors';
 import type { DeleteProblemsInput, UpdateProblemInput } from '../../shared/schemas';
 import type { AppContext } from '../env';
 import { requireProblem } from './problems';
-import { ALWAYS, bumpCounter, commit, committedSeq, notify, now } from './store';
+import { bumpCounter, commit, committedSeq, notify, now } from './store';
 
 // Editing and removing problems, sets and collections. Feedback stays append-only and Snapshots
 // immutable; deleting a Problem is the one way they go, together with it (migration 0006).
@@ -12,13 +12,13 @@ export function organizeService(ctx: AppContext) {
   async function write(condition: Parameters<typeof commit>[1], statements: D1PreparedStatement[]) {
     const committed = await commit(ctx, condition, [...statements, bumpCounter(ctx)]);
     if (committed.ok) await notify(ctx, committedSeq(committed.results.at(-1)));
-    return committed.ok;
+    return committed;
   }
 
   return {
     async updateProblem(input: UpdateProblemInput) {
       await requireProblem(ctx, input.problem_id);
-      const ok = await write(
+      const { ok } = await write(
         { sql: 'EXISTS (SELECT 1 FROM problems WHERE id = ?)', binds: [input.problem_id] },
         [
           ctx.db
@@ -45,50 +45,45 @@ export function organizeService(ctx: AppContext) {
     async deleteProblems(input: DeleteProblemsInput) {
       const ids = [...new Set(input.problem_ids)];
       const json = JSON.stringify(ids);
-      const [problems, snapshots] = await ctx.db.batch<{
+      const inIds = 'IN (SELECT value FROM json_each(?))';
+      // The object keys come from the deleting statements themselves, so a canvas save that
+      // commits just before the deletion is cleaned up too; one that commits after it fails its
+      // guard and removes its own upload (canvas.ts).
+      const committed = await write(
+        { sql: `EXISTS (SELECT 1 FROM problems WHERE id ${inIds})`, binds: [json] },
+        [
+          ctx.db.prepare(`INSERT INTO problem_deletions SELECT value FROM json_each(?)`).bind(json),
+          ctx.db.prepare(`DELETE FROM feedback WHERE problem_id ${inIds}`).bind(json),
+          ctx.db
+            .prepare(`DELETE FROM snapshots WHERE problem_id ${inIds} RETURNING image_key`)
+            .bind(json),
+          ctx.db
+            .prepare(
+              `DELETE FROM problems WHERE id ${inIds} RETURNING id, canvas_key, canvas_previous_key`,
+            )
+            .bind(json),
+          ctx.db.prepare(`DELETE FROM problem_deletions WHERE problem_id ${inIds}`).bind(json),
+        ],
+      );
+      if (!committed.ok) return { deleted: [], not_found: ids };
+      const snapshots = committed.results[2].results as { image_key: string }[];
+      const problems = committed.results[3].results as {
         id: string;
         canvas_key: string | null;
         canvas_previous_key: string | null;
-        image_key: string;
-      }>([
-        ctx.db
-          .prepare(
-            'SELECT id, canvas_key, canvas_previous_key FROM problems WHERE id IN (SELECT value FROM json_each(?))',
-          )
-          .bind(json),
-        ctx.db
-          .prepare(
-            'SELECT image_key FROM snapshots WHERE problem_id IN (SELECT value FROM json_each(?))',
-          )
-          .bind(json),
-      ]);
-      const found = problems.results.map((row) => row.id);
-      if (found.length) {
-        const existing = JSON.stringify(found);
-        const inFound = 'IN (SELECT value FROM json_each(?))';
-        await write(ALWAYS, [
-          ctx.db
-            .prepare(`INSERT INTO problem_deletions SELECT value FROM json_each(?)`)
-            .bind(existing),
-          ctx.db.prepare(`DELETE FROM feedback WHERE problem_id ${inFound}`).bind(existing),
-          ctx.db.prepare(`DELETE FROM snapshots WHERE problem_id ${inFound}`).bind(existing),
-          ctx.db.prepare(`DELETE FROM problems WHERE id ${inFound}`).bind(existing),
-          ctx.db
-            .prepare(`DELETE FROM problem_deletions WHERE problem_id ${inFound}`)
-            .bind(existing),
-        ]);
-        // The rows are gone; the objects they pointed at are now unreferenced.
-        const keys = [
-          ...problems.results.flatMap((row) => [row.canvas_key, row.canvas_previous_key]),
-          ...snapshots.results.map((row) => row.image_key),
-        ].filter((key): key is string => !!key);
-        if (keys.length) await ctx.storage.delete(keys).catch(() => undefined);
-      }
+      }[];
+      // The rows are gone; the objects they pointed at are now unreferenced.
+      const keys = [
+        ...problems.flatMap((row) => [row.canvas_key, row.canvas_previous_key]),
+        ...snapshots.map((row) => row.image_key),
+      ].filter((key): key is string => !!key);
+      if (keys.length) await ctx.storage.delete(keys).catch(() => undefined);
+      const found = problems.map((row) => row.id);
       return { deleted: found, not_found: ids.filter((value) => !found.includes(value)) };
     },
 
     async renameSet(setId: string, title: string) {
-      const ok = await write(
+      const { ok } = await write(
         { sql: 'EXISTS (SELECT 1 FROM problem_sets WHERE id = ?)', binds: [setId] },
         [ctx.db.prepare('UPDATE problem_sets SET title = ? WHERE id = ?').bind(title, setId)],
       );
@@ -97,7 +92,7 @@ export function organizeService(ctx: AppContext) {
     },
 
     async renameCollection(collectionId: string, title: string) {
-      const ok = await write(
+      const { ok } = await write(
         { sql: 'EXISTS (SELECT 1 FROM collections WHERE id = ?)', binds: [collectionId] },
         [ctx.db.prepare('UPDATE collections SET title = ? WHERE id = ?').bind(title, collectionId)],
       );
@@ -112,7 +107,7 @@ export function organizeService(ctx: AppContext) {
         .bind(setId)
         .first();
       if (!set) throw new DomainError('not_found', 'Problem Set not found');
-      const ok = await write(
+      const { ok } = await write(
         { sql: 'NOT EXISTS (SELECT 1 FROM problems WHERE set_id = ?)', binds: [setId] },
         [ctx.db.prepare('DELETE FROM problem_sets WHERE id = ?').bind(setId)],
       );
@@ -131,7 +126,7 @@ export function organizeService(ctx: AppContext) {
         .bind(collectionId)
         .first();
       if (!collection) throw new DomainError('not_found', 'Collection not found');
-      const ok = await write(
+      const { ok } = await write(
         {
           sql: 'NOT EXISTS (SELECT 1 FROM problems p JOIN problem_sets s ON s.id = p.set_id WHERE s.collection_id = ?)',
           binds: [collectionId],

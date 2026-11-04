@@ -41,3 +41,14 @@ export interface PasswordParams {
 export interface PasswordCredential extends PasswordParams {
   derived: string;
 }
+
+/**
+ * What each scope lets an AI app do, as the consent page states it. mcp:write includes the
+ * delete tools, so the label must say that it can permanently remove the owner's work.
+ */
+export const SCOPE_LABELS: Record<string, string> = {
+  'mcp:read': 'Read problems, submitted answers and feedback',
+  'mcp:write':
+    'Create, edit and permanently delete problems, including your handwriting, submitted answers and feedback on them; give feedback',
+  offline_access: 'Stay connected without asking again',
+};

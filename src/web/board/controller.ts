@@ -790,7 +790,13 @@ export class BoardController {
         ]);
         const before = new Set(this.state.problems.map((p) => p.id));
         const arrived = problems.filter((p) => !before.has(p.id)).map((p) => p.id);
-        const newIds = [...new Set([...this.state.newIds, ...arrived])];
+        const after = new Set(problems.map((p) => p.id));
+        const removed = [...before].filter((id) => !after.has(id));
+        // Deleted problems: nothing of theirs may be saved again from this device.
+        removed.forEach((id) => this.forget(id));
+        const newIds = [...new Set([...this.state.newIds, ...arrived])].filter((id) =>
+          after.has(id),
+        );
         this.remember(problems, newIds);
         // Keep the open problem; if it was deleted (or none was open), open the default one.
         const kept = problems.some((p) => p.id === this.state.currentId);
@@ -808,6 +814,11 @@ export class BoardController {
           await this.open(currentId);
           return;
         }
+        // The last problem was deleted: the old ink must not stay editable with nowhere to save.
+        if (opened && !currentId) {
+          this.clearCanvas();
+          return;
+        }
         if (currentId) await this.reconcile(currentId);
       } catch {
         // Offline: the feed reconnects and calls again.
@@ -820,6 +831,37 @@ export class BoardController {
       }
     });
     return this.refreshing;
+  }
+
+  /** Drop a deleted problem's save queue, cached document, camera and local draft. */
+  private forget(id: string) {
+    this.syncs.get(id)?.dispose();
+    this.syncs.delete(id);
+    this.documents.delete(id);
+    this.commitKeys.forEach(
+      (_key, scope) => scope.startsWith(id + ':') && this.commitKeys.delete(scope),
+    );
+    if (this.cameras[id]) {
+      delete this.cameras[id];
+      local.set('cameras', this.cameras);
+    }
+    void drafts.remove(id);
+  }
+
+  /** No problem is open: an empty, locked canvas. A pending load for a deleted problem is cancelled. */
+  private clearCanvas() {
+    this.showToken++;
+    clearTimeout(this.captureTimer);
+    this.dirty = false;
+    this.engine?.load(null, true);
+    local.set('current', null);
+    this.set({
+      canvas: 'loading',
+      hasInk: false,
+      fingerprint: null,
+      save: { kind: 'saved', at: null },
+      ui: CLOSED,
+    });
   }
 
   /** Apply another device's changes to the current problem, unless this device has unsaved work. */

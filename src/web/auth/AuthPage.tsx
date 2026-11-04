@@ -1,5 +1,10 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
-import type { AuthPageData, ConsentData, PasswordParams } from '../../shared/auth';
+import {
+  SCOPE_LABELS,
+  type AuthPageData,
+  type ConsentData,
+  type PasswordParams,
+} from '../../shared/auth';
 import { newCredential, stretch } from './password';
 import { BRAND_ICON, CopyRow, mcpUrl } from '../design/Copy';
 
@@ -394,12 +399,6 @@ function Connections() {
     </Layout>
   );
 }
-
-const SCOPE_LABELS: Record<string, string> = {
-  'mcp:read': 'Read problems, submitted answers and feedback',
-  'mcp:write': 'Create problems and give feedback',
-  offline_access: 'Stay connected without asking again',
-};
 
 function Consent({ data }: { data: ConsentData }) {
   const [busy, setBusy] = useState(false);

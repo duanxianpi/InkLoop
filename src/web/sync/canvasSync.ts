@@ -37,6 +37,7 @@ export class CanvasSync {
   private sending: Promise<void> | null = null;
   private timer: ReturnType<typeof setTimeout> | undefined;
   private retryMs = 0;
+  private disposed = false;
   private waiters: { resolve(): void; reject(error: unknown): void }[] = [];
 
   constructor(
@@ -119,7 +120,10 @@ export class CanvasSync {
     this.setStatus({ kind: 'saved', at: null });
   }
 
+  /** The problem is gone: stop for good, including an upload already in flight. */
   dispose() {
+    this.disposed = true;
+    this.latest = null;
     clearTimeout(this.timer);
   }
 
@@ -134,13 +138,14 @@ export class CanvasSync {
   }
 
   private setStatus(status: SaveStatus) {
+    if (this.disposed) return;
     this.status = status;
     this.onStatus(this);
   }
 
   private schedule(ms: number) {
     clearTimeout(this.timer);
-    this.timer = setTimeout(() => void this.send(), ms);
+    if (!this.disposed) this.timer = setTimeout(() => void this.send(), ms);
   }
 
   private settleWaiters(error?: unknown) {
@@ -182,6 +187,11 @@ export class CanvasSync {
       } catch (error) {
         if (error instanceof ApiError && CONFLICTS.has(error.code)) {
           this.setStatus({ kind: 'conflict', code: error.code as ConflictCode });
+        } else if (error instanceof ApiError && error.code === 'not_found') {
+          // The problem was deleted: there is nowhere to save, so retrying cannot help.
+          this.latest = null;
+          void drafts.remove(this.problemId);
+          this.setStatus({ kind: 'failed' });
         } else {
           this.setStatus({
             kind: error instanceof ApiError && error.offline ? 'offline' : 'failed',
