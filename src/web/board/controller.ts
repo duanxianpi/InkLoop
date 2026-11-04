@@ -328,9 +328,12 @@ export class BoardController {
     const width = innerWidth;
     const narrow = width < NARROW;
     const { hand } = this.state.prefs;
-    // Screen pixels clear of the tool rail; the chrome is drawn at 75%.
-    const left = narrow ? 9 : hand === 'right' ? 72 : 18;
-    const right = narrow ? 9 : hand === 'left' ? 72 : 18;
+    // Screen pixels clear of the tool rail, which is drawn at the design's chrome scale.
+    const scale =
+      Number(getComputedStyle(document.documentElement).getPropertyValue('--chrome-scale')) || 0.75;
+    const rail = Math.round(96 * scale);
+    const left = narrow ? 9 : hand === 'right' ? rail : 18;
+    const right = narrow ? 9 : hand === 'left' ? rail : 18;
     const z = clamp((width - left - right) / 480, 0.5, 1);
     return { x: left, y: 60 + (this.tileHeight + 30) * z, z };
   }
@@ -789,7 +792,9 @@ export class BoardController {
         const arrived = problems.filter((p) => !before.has(p.id)).map((p) => p.id);
         const newIds = [...new Set([...this.state.newIds, ...arrived])];
         this.remember(problems, newIds);
-        const currentId = this.state.currentId ?? defaultProblem(problems);
+        // Keep the open problem; if it was deleted (or none was open), open the default one.
+        const kept = problems.some((p) => p.id === this.state.currentId);
+        const currentId = kept ? this.state.currentId : defaultProblem(problems);
         const opened = currentId !== this.state.currentId;
         this.set((state) => ({
           collections,

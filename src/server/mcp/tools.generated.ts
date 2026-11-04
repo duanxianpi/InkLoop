@@ -132,12 +132,18 @@ export const TOOL_LIST = [
   },
   {
     "name": "get_submission",
-    "description": "Return the latest committed handwritten Snapshot of a problem as an image, with the question and Snapshot metadata. Never returns an unfinished draft; when answer_state is \"working\", has_unsubmitted_changes tells whether the user has edited since this Snapshot. Returns status \"not_ready\" when nothing has been submitted.",
+    "description": "Return the latest committed handwritten Snapshot of a problem as an image, with the question and Snapshot metadata. Never returns an unfinished draft; when answer_state is \"working\", has_unsubmitted_changes tells whether the user has edited since the latest Snapshot. Pass snapshot_id (from get_problem) to see an earlier attempt instead. Returns status \"not_ready\" when nothing has been submitted.",
     "inputSchema": {
       "type": "object",
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "properties": {
         "problem_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "snapshot_id": {
+          "description": "An earlier Snapshot of this problem to retrieve instead of the latest, e.g. to compare attempts. Omit for the latest committed Snapshot.",
           "type": "string",
           "minLength": 1,
           "maxLength": 100
@@ -234,6 +240,226 @@ export const TOOL_LIST = [
       "readOnlyHint": false,
       "destructiveHint": false,
       "idempotentHint": false,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "list_collections",
+    "description": "List Collections and their Problem Sets (with problem counts), including empty ones. Use the IDs with create_problems (set_id or new_set.collection_id).",
+    "inputSchema": {
+      "type": "object",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {}
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "get_problem",
+    "description": "Return one problem: statement, category, answer state, every Snapshot (IDs and sequence, no images) and the full feedback history. Use get_submission for the handwritten image.",
+    "inputSchema": {
+      "type": "object",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "problem_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        }
+      },
+      "required": [
+        "problem_id"
+      ]
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "update_problem",
+    "description": "Change a problem's title, statement (body) or category (type; null removes it). The user's handwriting, Snapshots and feedback are kept.",
+    "inputSchema": {
+      "type": "object",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "problem_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "body": {
+          "description": "New problem statement; Markdown with $…$ / $$…$$ math.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 20000
+        },
+        "type": {
+          "description": "New category, or null to remove it.",
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 50
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "problem_id"
+      ]
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "delete_problems",
+    "description": "Permanently delete problems together with the user's handwriting, all Snapshots and all feedback on them. This cannot be undone: only do it when the user asks. Unknown IDs are reported in not_found.",
+    "inputSchema": {
+      "type": "object",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "problem_ids": {
+          "minItems": 1,
+          "maxItems": 50,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          }
+        }
+      },
+      "required": [
+        "problem_ids"
+      ]
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": true,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "update_problem_set",
+    "description": "Rename a Problem Set.",
+    "inputSchema": {
+      "type": "object",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "set_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        }
+      },
+      "required": [
+        "set_id",
+        "title"
+      ]
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "update_collection",
+    "description": "Rename a Collection.",
+    "inputSchema": {
+      "type": "object",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "collection_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        }
+      },
+      "required": [
+        "collection_id",
+        "title"
+      ]
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "delete_problem_set",
+    "description": "Delete an empty Problem Set. A set that still has problems is refused; delete its problems with delete_problems first.",
+    "inputSchema": {
+      "type": "object",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "set_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        }
+      },
+      "required": [
+        "set_id"
+      ]
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": true,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "delete_collection",
+    "description": "Delete a Collection that has no problems left, together with its empty Problem Sets. A Collection that still has problems is refused.",
+    "inputSchema": {
+      "type": "object",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "collection_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        }
+      },
+      "required": [
+        "collection_id"
+      ]
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": true,
       "openWorldHint": false
     }
   }

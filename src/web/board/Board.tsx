@@ -1,16 +1,10 @@
 import { memo, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Tldraw } from 'tldraw';
 import 'tldraw/tldraw.css';
-import '@fontsource/inter/400.css';
-import '@fontsource/inter/500.css';
-import '@fontsource/inter/600.css';
-import '@fontsource/inter/700.css';
-import '@fontsource/stix-two-text/400.css';
-import '@fontsource/stix-two-text/400-italic.css';
-import '@fontsource/stix-two-text/600.css';
 import './board.css';
 import type { ProblemDetail, ProblemSummary } from '../../shared/model';
 import { canvasAssetUrls } from '../canvas/assets';
+import { CopyRow, mcpUrl } from '../design/Copy';
 import { Engine } from '../canvas/engine';
 import { BoardController, type BoardState } from './controller';
 import { loadMath } from './math';
@@ -232,9 +226,10 @@ function Notice({ s, c }: { s: BoardState; c: BoardController }) {
         <>
           <h2>No problems yet</h2>
           <p>
-            Ask your AI to create problems through its InkLoop connection. They appear here
+            Add this MCP server to your AI app, then ask it to create problems. They appear here
             automatically.
           </p>
+          <CopyRow text={mcpUrl()} />
           <a className="pbtn" href="/settings/connected-apps">
             Connected AI apps
           </a>

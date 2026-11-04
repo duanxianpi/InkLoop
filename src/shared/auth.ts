@@ -10,7 +10,14 @@ export interface ConsentData {
 }
 export type PasswordPurpose = 'setup' | 'login' | 'recovery' | 'change';
 export type AuthPageData =
-  | { kind: 'password'; purpose: PasswordPurpose; initialized: boolean; origin: string }
+  | {
+      kind: 'password';
+      purpose: PasswordPurpose;
+      initialized: boolean;
+      origin: string;
+      /** Before setup only: the deployment's D1 Studio page, when the deployment knows it. */
+      d1ConsoleUrl?: string;
+    }
   | ({ kind: 'consent' } & ConsentData)
   | { kind: 'connections' };
 

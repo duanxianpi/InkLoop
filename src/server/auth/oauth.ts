@@ -9,6 +9,10 @@ import {
 import { assert, json, type Env, type State } from './common';
 import type { GrantProps, McpIdentity } from './types';
 
+const SCOPE_LABELS: Record<string, string> = {
+  'mcp:write': 'Create problems and give feedback',
+};
+
 export type AuthenticatedHandler = (request: Request, owner: McpIdentity) => Promise<Response>;
 
 /** Reuse the state read for this request; no cross-request authorization cache. */
@@ -35,7 +39,7 @@ function configuration(current: State, handler?: AuthenticatedHandler): OAuthPro
         const ctx = context as OAuthResourceContext<GrantProps>;
         if (!(await validGrant(env, ctx.props, current)))
           return json({ error: 'invalid_token' }, 401, {
-            'WWW-Authenticate': `Bearer resource_metadata="${origin}/.well-known/oauth-protected-resource/mcp", error="invalid_token"`,
+            'WWW-Authenticate': `Bearer resource_metadata="${origin}/.well-known/oauth-protected-resource/mcp", error="invalid_token", scope="mcp:read mcp:write"`,
           });
         if (!ctx.auth.scope.includes('mcp:read')) return insufficientScope(ctx.auth, ['mcp:read']);
         if (!handler) return json({ error: 'not_found' }, 404);
@@ -44,7 +48,11 @@ function configuration(current: State, handler?: AuthenticatedHandler): OAuthPro
           authEpoch: ctx.props.authEpoch,
           scopes: ctx.auth.scope,
           requireScope(scope) {
-            assert(ctx.auth.scope.includes(scope), 403, 'Missing ' + scope + ' scope');
+            assert(
+              ctx.auth.scope.includes(scope),
+              403,
+              `This app was connected with read-only access (${scope} was not granted). Reconnect it and allow "${SCOPE_LABELS[scope] ?? scope}" to use this tool.`,
+            );
           },
         });
       },
@@ -55,7 +63,10 @@ function configuration(current: State, handler?: AuthenticatedHandler): OAuthPro
     clientRegistrationEndpoint: origin + '/oauth/register',
     clientIdMetadataDocumentEnabled: true,
     scopesSupported: ['mcp:read', 'mcp:write', 'offline_access'],
-    requiredScopes: ['mcp:read'],
+    // Advertised in resource metadata and the 401 challenge, so MCP clients request both by
+    // default (they request what the resource advertises). Only mcp:read is enforced for every
+    // request; the owner may still grant read-only access on the consent page.
+    requiredScopes: ['mcp:read', 'mcp:write'],
     resourceMetadata: { resource: origin + '/mcp', authorization_servers: [origin] },
     accessTokenTTL: 300,
     refreshTokenTTL: 2592000,

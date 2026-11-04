@@ -5,6 +5,8 @@ export interface Env extends AuthEnv {
   ASSETS: Fetcher;
   /** Private bucket for canvas documents and immutable Snapshot images. Never publicly exposed. */
   STORAGE: R2Bucket;
+  /** Set at deploy time: the dashboard page of this Worker's D1 database (setup instructions). */
+  D1_CONSOLE_URL?: string;
   /** Pushes change notifications to open pages over WebSockets. */
   CHANGE_HUB: DurableObjectNamespace<ChangeHub>;
 }

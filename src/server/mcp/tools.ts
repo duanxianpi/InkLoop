@@ -3,8 +3,16 @@ import { DomainError } from '../../shared/errors';
 import {
   appendFeedbackInput,
   createProblemsInput,
+  deleteCollectionInput,
+  deleteProblemSetInput,
+  deleteProblemsInput,
+  getProblemInput,
   getSubmissionInput,
+  listCollectionsInput,
   listProblemsInput,
+  updateCollectionInput,
+  updateProblemInput,
+  updateProblemSetInput,
 } from '../../shared/schemas';
 import { errorPayload, HttpError } from '../http/errors';
 import type { McpIdentity } from '../auth/types';
@@ -12,11 +20,19 @@ import type { Services } from '../services';
 import {
   parseAppendFeedback,
   parseCreateProblems,
+  parseDeleteCollection,
+  parseDeleteProblems,
+  parseDeleteProblemSet,
+  parseGetProblem,
   parseGetSubmission,
+  parseListCollections,
   parseListProblems,
+  parseUpdateCollection,
+  parseUpdateProblem,
+  parseUpdateProblemSet,
 } from './input';
 
-// The four MCP tools (§16). Each one validates input, enforces scope, and delegates to the same
+// The MCP tools (§16), plus reading and organizing problems. Each one validates input, enforces scope, and delegates to the same
 // application services as the Browser API. No business logic lives here. No append_follow_up (§16.5).
 
 type Content = { type: 'text'; text: string } | { type: 'image'; mimeType: string; data: string };
@@ -77,13 +93,13 @@ export const TOOLS = {
 
   get_submission: {
     description:
-      'Return the latest committed handwritten Snapshot of a problem as an image, with the question and Snapshot metadata. Never returns an unfinished draft; when answer_state is "working", has_unsubmitted_changes tells whether the user has edited since this Snapshot. Returns status "not_ready" when nothing has been submitted.',
+      'Return the latest committed handwritten Snapshot of a problem as an image, with the question and Snapshot metadata. Never returns an unfinished draft; when answer_state is "working", has_unsubmitted_changes tells whether the user has edited since the latest Snapshot. Pass snapshot_id (from get_problem) to see an earlier attempt instead. Returns status "not_ready" when nothing has been submitted.',
     annotations: { readOnlyHint: true, openWorldHint: false },
     schema: getSubmissionInput,
     parse: parseGetSubmission,
     write: false,
-    call: async ({ problem_id }, services) => {
-      const submission = await services.submissions.latest(problem_id);
+    call: async ({ problem_id, snapshot_id }, services) => {
+      const submission = await services.submissions.latest(problem_id, snapshot_id);
       if (submission.status === 'not_ready') return ok({ ...submission });
       const { image, ...metadata } = submission;
       return {
@@ -108,6 +124,124 @@ export const TOOLS = {
     write: true,
     call: async (input, services) => ok({ ...(await services.feedback.append(input)) }),
   } satisfies Tool<ReturnType<typeof parseAppendFeedback>>,
+
+  list_collections: {
+    description:
+      'List Collections and their Problem Sets (with problem counts), including empty ones. Use the IDs with create_problems (set_id or new_set.collection_id).',
+    annotations: { readOnlyHint: true, openWorldHint: false },
+    schema: listCollectionsInput,
+    parse: parseListCollections,
+    write: false,
+    call: async (_input, services) => ok({ collections: await services.problems.collections() }),
+  } satisfies Tool<ReturnType<typeof parseListCollections>>,
+
+  get_problem: {
+    description:
+      'Return one problem: statement, category, answer state, every Snapshot (IDs and sequence, no images) and the full feedback history. Use get_submission for the handwritten image.',
+    annotations: { readOnlyHint: true, openWorldHint: false },
+    schema: getProblemInput,
+    parse: parseGetProblem,
+    write: false,
+    call: async ({ problem_id }, services) => {
+      const { canvas_fingerprint: _fingerprint, ...detail } =
+        await services.problems.get(problem_id);
+      return ok({
+        ...detail,
+        snapshots: detail.snapshots.map(({ fingerprint: _f, ...snapshot }) => snapshot),
+      });
+    },
+  } satisfies Tool<ReturnType<typeof parseGetProblem>>,
+
+  update_problem: {
+    description:
+      "Change a problem's title, statement (body) or category (type; null removes it). The user's handwriting, Snapshots and feedback are kept.",
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    schema: updateProblemInput,
+    parse: parseUpdateProblem,
+    write: true,
+    call: async (input, services) => ok({ ...(await services.organize.updateProblem(input)) }),
+  } satisfies Tool<ReturnType<typeof parseUpdateProblem>>,
+
+  delete_problems: {
+    description:
+      "Permanently delete problems together with the user's handwriting, all Snapshots and all feedback on them. This cannot be undone: only do it when the user asks. Unknown IDs are reported in not_found.",
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    schema: deleteProblemsInput,
+    parse: parseDeleteProblems,
+    write: true,
+    call: async (input, services) => ok({ ...(await services.organize.deleteProblems(input)) }),
+  } satisfies Tool<ReturnType<typeof parseDeleteProblems>>,
+
+  update_problem_set: {
+    description: 'Rename a Problem Set.',
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    schema: updateProblemSetInput,
+    parse: parseUpdateProblemSet,
+    write: true,
+    call: async ({ set_id, title }, services) =>
+      ok({ ...(await services.organize.renameSet(set_id, title)) }),
+  } satisfies Tool<ReturnType<typeof parseUpdateProblemSet>>,
+
+  update_collection: {
+    description: 'Rename a Collection.',
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    schema: updateCollectionInput,
+    parse: parseUpdateCollection,
+    write: true,
+    call: async ({ collection_id, title }, services) =>
+      ok({ ...(await services.organize.renameCollection(collection_id, title)) }),
+  } satisfies Tool<ReturnType<typeof parseUpdateCollection>>,
+
+  delete_problem_set: {
+    description:
+      'Delete an empty Problem Set. A set that still has problems is refused; delete its problems with delete_problems first.',
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    schema: deleteProblemSetInput,
+    parse: parseDeleteProblemSet,
+    write: true,
+    call: async ({ set_id }, services) => ok({ ...(await services.organize.deleteSet(set_id)) }),
+  } satisfies Tool<ReturnType<typeof parseDeleteProblemSet>>,
+
+  delete_collection: {
+    description:
+      'Delete a Collection that has no problems left, together with its empty Problem Sets. A Collection that still has problems is refused.',
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    schema: deleteCollectionInput,
+    parse: parseDeleteCollection,
+    write: true,
+    call: async ({ collection_id }, services) =>
+      ok({ ...(await services.organize.deleteCollection(collection_id)) }),
+  } satisfies Tool<ReturnType<typeof parseDeleteCollection>>,
 };
 
 export type ToolName = keyof typeof TOOLS;

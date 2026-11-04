@@ -514,3 +514,149 @@ test('change counter, long poll and the notification-only ChangeHub', async () =
     await mf.dispose();
   }
 });
+
+test('agents can read, edit and remove problems, sets and collections', async () => {
+  const { mf, db, web, mcp, bucket } = await start();
+  try {
+    const call = async (name, args) => (await mcp(name, args)).structuredContent;
+    const created = await call('create_problems', {
+      request_id: 'org-1',
+      new_set: { title: 'W1', new_collection_title: 'Course' },
+      problems: [
+        { title: 'First', body: 'Show $x$.', type: 'Proofs' },
+        { title: 'Second', body: 'More.' },
+      ],
+    });
+    const [p1, p2] = created.problem_ids;
+    const empty = await call('create_problems', {
+      request_id: 'org-2',
+      new_set: { title: 'Empty soon', collection_id: created.collection_id },
+      problems: [{ title: 'Temp', body: 'Temp' }],
+    });
+    await call('delete_problems', { problem_ids: empty.problem_ids });
+
+    // list_collections shows every set, including an empty one, with counts.
+    const { collections } = await call('list_collections', {});
+    assert.deepEqual(
+      collections.map((c) => [c.title, c.sets.map((s) => [s.title, s.problem_count])]),
+      [
+        [
+          'Course',
+          [
+            ['W1', 2],
+            ['Empty soon', 0],
+          ],
+        ],
+      ],
+    );
+
+    // update_problem edits text and category; null removes the category.
+    const updated = await call('update_problem', {
+      problem_id: p1,
+      title: 'First, revised',
+      type: null,
+    });
+    assert.deepEqual(updated, {
+      problem_id: p1,
+      title: 'First, revised',
+      body: 'Show $x$.',
+      type: null,
+    });
+    assert.equal((await mcp('update_problem', { problem_id: p1 })).isError, true);
+    assert.equal(
+      (await call('update_problem', { problem_id: 'missing', title: 'x' })).error,
+      'not_found',
+    );
+
+    // Two Snapshots and feedback, then an earlier Snapshot by ID.
+    await json(await save(web, p1, { base: 0, epoch: 0, fingerprint: 'a1' }));
+    const s1 = (
+      await json(await markReady(web, p1, { revision: 1, epoch: 0, key: 'o1', image: png(2, 2) }))
+    ).snapshot;
+    await json(await web(`/api/problems/${p1}/resume`, { method: 'POST' }));
+    await json(await save(web, p1, { base: 1, epoch: 1, fingerprint: 'a2' }));
+    await json(await markReady(web, p1, { revision: 2, epoch: 1, key: 'o2', image: png(3, 3) }));
+    await call('append_feedback', {
+      problem_id: p1,
+      snapshot_id: s1.id,
+      feedback: 'Close.',
+      verdict: 'partial',
+    });
+    const earlier = await mcp('get_submission', { problem_id: p1, snapshot_id: s1.id });
+    assert.deepEqual(
+      [earlier.structuredContent.sequence, earlier.structuredContent.latest_sequence],
+      [1, 2],
+    );
+    assert.equal(earlier.content[1].data, png(2, 2));
+    assert.equal(
+      (await call('get_submission', { problem_id: p2, snapshot_id: s1.id })).error,
+      'not_found',
+      'a Snapshot of another problem is not served',
+    );
+
+    // get_problem: statement, Snapshots without images, full feedback history.
+    const problem = await call('get_problem', { problem_id: p1 });
+    assert.equal(problem.body, 'Show $x$.');
+    assert.deepEqual(
+      problem.snapshots.map((s) => s.sequence),
+      [1, 2],
+    );
+    assert.equal(problem.feedback.length, 1);
+    assert.equal(problem.canvas_fingerprint, undefined);
+
+    // Renames.
+    assert.equal(
+      (await call('update_problem_set', { set_id: created.set_id, title: 'Week 1' })).title,
+      'Week 1',
+    );
+    assert.equal(
+      (await call('update_collection', { collection_id: created.collection_id, title: 'CS' }))
+        .title,
+      'CS',
+    );
+    assert.equal(
+      (await call('update_problem_set', { set_id: 'missing', title: 'x' })).error,
+      'not_found',
+    );
+
+    // A set or collection with problems is not deleted.
+    assert.equal(
+      (await call('delete_problem_set', { set_id: created.set_id })).error,
+      'invalid_request',
+    );
+    assert.equal(
+      (await call('delete_collection', { collection_id: created.collection_id })).error,
+      'invalid_request',
+    );
+
+    // delete_problems removes the problem with its canvas, Snapshots, feedback and stored objects.
+    assert.ok((await listKeys(bucket, `snapshots/${p1}/`)).length === 2);
+    const deleted = await call('delete_problems', { problem_ids: [p1, 'missing', p1] });
+    assert.deepEqual(deleted, { deleted: [p1], not_found: ['missing'] });
+    for (const table of ['snapshots', 'feedback'])
+      assert.equal(
+        (await db.prepare(`SELECT COUNT(*) n FROM ${table} WHERE problem_id = ?`).bind(p1).first())
+          .n,
+        0,
+      );
+    assert.deepEqual(await listKeys(bucket, `snapshots/${p1}/`), []);
+    assert.deepEqual(await listKeys(bucket, `canvas/${p1}/`), []);
+    assert.equal((await db.prepare('SELECT COUNT(*) n FROM problem_deletions').first()).n, 0);
+    assert.equal((await web(`/api/problems/${p1}`)).status, 404);
+    // Outside a deletion, Snapshots and feedback stay immutable.
+    await json(await save(web, p2, { base: 0, epoch: 0, fingerprint: 'b1' }));
+    await json(await markReady(web, p2, { revision: 1, epoch: 0, key: 'o3', image: png(2, 2) }));
+    await assert.rejects(db.prepare('DELETE FROM snapshots').run(), /snapshot_immutable/);
+
+    await call('delete_problems', { problem_ids: [p2] });
+    assert.deepEqual(await call('delete_problem_set', { set_id: created.set_id }), {
+      deleted: created.set_id,
+    });
+    assert.deepEqual(await call('delete_collection', { collection_id: created.collection_id }), {
+      deleted: created.collection_id,
+    });
+    assert.deepEqual((await call('list_collections', {})).collections, []);
+  } finally {
+    await mf.dispose();
+  }
+});

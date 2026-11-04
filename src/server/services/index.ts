@@ -2,6 +2,7 @@ import type { AppContext } from '../env';
 import { canvasService } from './canvas';
 import { changeService } from './changes';
 import { feedbackService } from './feedback';
+import { organizeService } from './organize';
 import { preferenceService } from './preferences';
 import { problemService } from './problems';
 import { submissionService } from './submissions';
@@ -21,6 +22,7 @@ export function createServices(ctx: AppContext) {
     canvas: canvasService(ctx),
     submissions: submissionService(ctx),
     feedback: feedbackService(ctx),
+    organize: organizeService(ctx),
     preferences: preferenceService(ctx),
     changes: changeService(ctx),
   };

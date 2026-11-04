@@ -13,6 +13,7 @@ export interface ProblemSetSummary {
   collection_id: string;
   title: string;
   sort_order: number;
+  problem_count: number;
 }
 export interface CollectionSummary {
   id: string;
@@ -139,6 +140,8 @@ export interface Submission {
   problem_id: string;
   snapshot_id: string;
   sequence: number;
+  /** Sequence of the latest committed Snapshot; differs from `sequence` for an earlier one. */
+  latest_sequence: number;
   created_at: string;
   answer_state: AnswerState;
   has_unsubmitted_changes: boolean;

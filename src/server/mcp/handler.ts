@@ -20,6 +20,8 @@ import { callTool, IMAGE_DATA, isToolName, type ToolResult } from './tools';
  */
 const PROTOCOL_VERSIONS = ['2025-11-25', '2025-06-18'];
 const SERVER_INFO = { name: 'inkloop', version: '0.1.0' };
+/** Static brand icon, versioned in its name because /assets/* is cached as immutable. */
+const BRAND_ICON = '/assets/brand/inkloop-v2';
 
 // JSON-RPC 2.0 error codes.
 const PARSE_ERROR = -32700;
@@ -139,12 +141,21 @@ export async function handleMcp(
         // Version negotiation: echo the client's version if supported, otherwise offer ours.
         // Being stateless, nothing is remembered; every later request stands on its own.
         const requested = params.protocolVersion;
+        const origin = new URL(request.url).origin;
         return result(id, {
           protocolVersion: PROTOCOL_VERSIONS.includes(requested as string)
             ? requested
             : PROTOCOL_VERSIONS[0],
           capabilities: { tools: {} },
-          serverInfo: SERVER_INFO,
+          serverInfo: {
+            ...SERVER_INFO,
+            title: 'InkLoop',
+            websiteUrl: origin + '/app',
+            icons: [
+              { src: origin + BRAND_ICON + '.png', mimeType: 'image/png', sizes: ['256x256'] },
+              { src: origin + BRAND_ICON + '.svg', mimeType: 'image/svg+xml', sizes: ['any'] },
+            ],
+          },
         });
       }
       case 'ping':

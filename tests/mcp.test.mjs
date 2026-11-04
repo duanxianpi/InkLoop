@@ -39,6 +39,22 @@ function fakeServices(calls = []) {
     problems: {
       create: record('problems.create', { set_id: 's1', problem_ids: ['p1'] }),
       list: record('problems.list', { problems: [], next_cursor: null }),
+      collections: record('problems.collections', []),
+      get: record('problems.get', {
+        id: 'p1',
+        body: 'B',
+        canvas_fingerprint: 'hidden',
+        snapshots: [{ id: 'snap1', sequence: 1, fingerprint: 'hidden' }],
+        feedback: [],
+      }),
+    },
+    organize: {
+      updateProblem: record('organize.updateProblem', { problem_id: 'p1', title: 'T' }),
+      deleteProblems: record('organize.deleteProblems', { deleted: ['p1'], not_found: [] }),
+      renameSet: record('organize.renameSet', { set_id: 's1', title: 'T' }),
+      renameCollection: record('organize.renameCollection', { collection_id: 'c1', title: 'T' }),
+      deleteSet: record('organize.deleteSet', { deleted: 's1' }),
+      deleteCollection: record('organize.deleteCollection', { deleted: 'c1' }),
     },
     submissions: {
       latest: async (input) => {
@@ -91,8 +107,25 @@ test('the official MCP client connects, lists and calls every tool', async () =>
     const { tools } = await client.listTools();
     assert.deepEqual(
       tools.map((tool) => tool.name),
-      ['create_problems', 'list_problems', 'get_submission', 'append_feedback'],
+      [
+        'create_problems',
+        'list_problems',
+        'get_submission',
+        'append_feedback',
+        'list_collections',
+        'get_problem',
+        'update_problem',
+        'delete_problems',
+        'update_problem_set',
+        'update_collection',
+        'delete_problem_set',
+        'delete_collection',
+      ],
     );
+    const destructive = tools
+      .filter((tool) => tool.annotations?.destructiveHint)
+      .map((t) => t.name);
+    assert.deepEqual(destructive, ['delete_problems', 'delete_problem_set', 'delete_collection']);
 
     const created = await client.callTool({
       name: 'create_problems',
@@ -126,9 +159,43 @@ test('the official MCP client connects, lists and calls every tool', async () =>
     assert.equal(invalid.isError, true);
     assert.equal(invalid.structuredContent.error, 'invalid_request');
     assert.match(invalid.structuredContent.message, /exactly one of set_id or new_set/);
+    for (const [name, args] of [
+      ['list_collections', {}],
+      ['get_problem', { problem_id: 'p1' }],
+      ['update_problem', { problem_id: 'p1', type: null }],
+      ['delete_problems', { problem_ids: ['p1'] }],
+      ['update_problem_set', { set_id: 's1', title: 'T' }],
+      ['update_collection', { collection_id: 'c1', title: 'T' }],
+      ['delete_problem_set', { set_id: 's1' }],
+      ['delete_collection', { collection_id: 'c1' }],
+    ]) {
+      const result = await client.callTool({ name, arguments: args });
+      assert.equal(result.isError, undefined, name);
+    }
+    const problem = await client.callTool({ name: 'get_problem', arguments: { problem_id: 'p1' } });
+    assert.equal(
+      problem.structuredContent.canvas_fingerprint,
+      undefined,
+      'internal fields omitted',
+    );
+    assert.equal(problem.structuredContent.snapshots[0].fingerprint, undefined);
     assert.deepEqual(
       calls.map(([name]) => name),
-      ['problems.create', 'problems.list', 'submissions.latest', 'feedback.append'],
+      [
+        'problems.create',
+        'problems.list',
+        'submissions.latest',
+        'feedback.append',
+        'problems.collections',
+        'problems.get',
+        'organize.updateProblem',
+        'organize.deleteProblems',
+        'organize.renameSet',
+        'organize.renameCollection',
+        'organize.deleteSet',
+        'organize.deleteCollection',
+        'problems.get',
+      ],
     );
   } finally {
     await client.close();

@@ -64,7 +64,59 @@ export const listProblemsInput = z.object({
 });
 export type ListProblemsInput = z.infer<typeof listProblemsInput>;
 
-export const getSubmissionInput = z.object({ problem_id: id });
+export const getSubmissionInput = z.object({
+  problem_id: id,
+  snapshot_id: id
+    .optional()
+    .describe(
+      'An earlier Snapshot of this problem to retrieve instead of the latest, e.g. to compare attempts. Omit for the latest committed Snapshot.',
+    ),
+});
+export type GetSubmissionInput = z.infer<typeof getSubmissionInput>;
+
+export const getProblemInput = z.object({ problem_id: id });
+
+export const listCollectionsInput = z.object({});
+
+export const updateProblemInput = z
+  .object({
+    problem_id: id,
+    title: z.string().min(1).max(LIMITS.titleLength).optional(),
+    body: z
+      .string()
+      .min(1)
+      .max(LIMITS.bodyLength)
+      .optional()
+      .describe('New problem statement; Markdown with $…$ / $$…$$ math.'),
+    type: z
+      .string()
+      .min(1)
+      .max(LIMITS.typeLength)
+      .nullable()
+      .optional()
+      .describe('New category, or null to remove it.'),
+  })
+  .refine(
+    (value) => value.title !== undefined || value.body !== undefined || value.type !== undefined,
+    { message: 'Provide at least one of title, body or type' },
+  );
+export type UpdateProblemInput = z.infer<typeof updateProblemInput>;
+
+export const deleteProblemsInput = z.object({
+  problem_ids: z.array(id).min(1).max(LIMITS.createProblemsBatch),
+});
+export type DeleteProblemsInput = z.infer<typeof deleteProblemsInput>;
+
+export const updateProblemSetInput = z.object({
+  set_id: id,
+  title: z.string().min(1).max(LIMITS.titleLength),
+});
+export const updateCollectionInput = z.object({
+  collection_id: id,
+  title: z.string().min(1).max(LIMITS.titleLength),
+});
+export const deleteProblemSetInput = z.object({ set_id: id });
+export const deleteCollectionInput = z.object({ collection_id: id });
 
 export const calloutKind = z.enum(['correct', 'fix', 'incorrect']);
 export const callout = z.object({

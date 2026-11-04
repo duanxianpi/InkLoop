@@ -1,7 +1,6 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
-import { AuthPage } from './auth/AuthPage';
+import { AuthPage, Layout } from './auth/AuthPage';
 import type { AuthPageData, ConsentData } from '../shared/auth';
-import './auth/styles.css';
 import { pageForPath } from '../shared/pages';
 
 // The board (tldraw, MathJax, fonts) is its own chunk; account pages never load it.
@@ -12,6 +11,8 @@ export function App() {
   const page = pageForPath(location.pathname);
   const [data, setData] = useState<AuthPageData | null>(null);
   const [error, setError] = useState('');
+  // An OAuth error the app should hear about: the server-built redirect back to its callback.
+  const [returnTo, setReturnTo] = useState<string | null>(null);
   const isAccount = !!page && page.kind !== 'canvas';
 
   useEffect(() => {
@@ -39,23 +40,27 @@ export function App() {
           const result = (await response.json()) as ConsentData & {
             error?: string;
             message?: string;
+            redirectTo?: string;
           };
-          if (!response.ok)
+          if (!response.ok) {
+            if (!controller.signal.aborted) setReturnTo(result.redirectTo ?? null);
             throw new Error(
               result.message || result.error || 'Could not load authorization request',
             );
+          }
           if (!controller.signal.aborted) setData({ ...result, kind: 'consent' });
           return;
         }
         const response = await fetch('/api/status', { signal: controller.signal });
         if (!response.ok) throw new Error('Could not load account status');
-        const result = (await response.json()) as { initialized: boolean };
+        const result = (await response.json()) as { initialized: boolean; d1ConsoleUrl?: string };
         if (!controller.signal.aborted)
           setData({
             kind: 'password',
             purpose: page!.purpose!,
             initialized: result.initialized,
             origin: location.origin,
+            d1ConsoleUrl: result.d1ConsoleUrl,
           });
       } catch (failure) {
         if (!controller.signal.aborted)
@@ -73,12 +78,14 @@ export function App() {
     );
   if (data) return <AuthPage data={data} />;
   return (
-    <main className="auth-page">
-      <a className="brand" href="/app">
-        InkLoop
-      </a>
-      <p role="status">{error || 'Loading…'}</p>
-      {error && <button onClick={() => location.reload()}>Retry</button>}
-    </main>
+    <Layout title={error ? "This page can't be shown" : 'Loading…'}>
+      {error && <p role="status">{error}</p>}
+      {error && returnTo ? (
+        // Built by the server after validating the app's redirect URI; tells the app the request failed.
+        <button onClick={() => location.assign(returnTo)}>Return to the app</button>
+      ) : (
+        error && <button onClick={() => location.reload()}>Retry</button>
+      )}
+    </Layout>
   );
 }

@@ -1,4 +1,5 @@
 import { INK, type InkColor } from '../canvas/engine';
+import { CopyButton, mcpUrl } from '../design/Copy';
 import type { BoardController, BoardState } from './controller';
 import { EraserIcon, PenIcon, RedoIcon, SettingsIcon, UndoIcon } from './icons';
 
@@ -123,6 +124,7 @@ function Settings({ s, c }: { s: BoardState; c: BoardController }) {
       <div className="grp">
         <h3>Account</h3>
         <div className="prows">
+          <CopyButton className="prow" text={mcpUrl()} label="Copy MCP server URL" />
           <a className="prow" href="/settings/connected-apps">
             Connected AI apps
           </a>

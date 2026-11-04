@@ -1,5 +1,6 @@
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 const root = fileURLToPath(new URL('../../', import.meta.url));
@@ -40,9 +41,36 @@ export function deploy(extra = [], execute = spawnSync) {
   }
   show(migration);
   if (migration.status !== 0) return migration.status ?? 1;
-  const deployed = run(['deploy', '--experimental-auto-create']);
+  const consoleUrl = d1ConsoleUrl(run);
+  const deployed = run([
+    'deploy',
+    '--experimental-auto-create',
+    ...(consoleUrl ? ['--var', `D1_CONSOLE_URL:${consoleUrl}`] : []),
+  ]);
   show(deployed);
   return deployed.status ?? 1;
+}
+
+/**
+ * The Cloudflare dashboard's D1 Studio page for this Worker's database, shown on the setup page
+ * so the owner can find the claim key. Best effort: any lookup failure only omits the link.
+ * Auto-provisioned databases are named `<worker>-db`.
+ */
+export function d1ConsoleUrl(run) {
+  try {
+    const name = /"name"\s*:\s*"([^"]+)"/.exec(
+      readFileSync(resolve(root, 'wrangler.jsonc'), 'utf8'),
+    )?.[1];
+    const who = run(['whoami', '--json']);
+    const list = run(['d1', 'list', '--json']);
+    if (!name || who.status !== 0 || list.status !== 0) return null;
+    const accounts = JSON.parse(who.stdout).accounts ?? [];
+    const database = JSON.parse(list.stdout).find((entry) => entry.name === `${name}-db`);
+    if (accounts.length !== 1 || !database?.uuid) return null;
+    return `https://dash.cloudflare.com/${accounts[0].id}/workers/d1/databases/${database.uuid}/studio`;
+  } catch {
+    return null;
+  }
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

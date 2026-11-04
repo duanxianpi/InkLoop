@@ -40,8 +40,13 @@ const app = new Hono<ServerEnv>();
 app.use('*', securityHeaders, requestContext);
 app.onError((error, c) => {
   if (error instanceof HttpError || error instanceof DomainError) return errorResponse(error);
-  if (error instanceof AuthorizationError || error instanceof CimdFetchError)
-    return json({ error: 'invalid_request', message: 'Invalid OAuth request' }, 400);
+  if (error instanceof AuthorizationError)
+    return json({ error: error.code, message: error.description }, 400);
+  if (error instanceof CimdFetchError)
+    return json(
+      { error: 'client_metadata_unavailable', message: "Couldn't load the app's client metadata" },
+      400,
+    );
   console.error('request_failed', error.name);
   return c.json({ error: 'internal_error' }, 500);
 });
@@ -62,7 +67,16 @@ for (const page of PAGES) {
 }
 
 // Public setup state and password sign-in. Setup and recovery prove the D1 claim/recovery key.
-app.get('/api/status', (c) => c.json({ initialized: !!c.get('authState').initialized_at }));
+app.get('/api/status', (c) => {
+  const initialized = !!c.get('authState').initialized_at;
+  // Before setup only: the exact D1 Studio page holding the claim key (it names the account).
+  const studio = !initialized && c.env.D1_CONSOLE_URL ? { d1ConsoleUrl: c.env.D1_CONSOLE_URL } : {};
+  return c.json({ initialized, ...studio });
+});
+// Browsers and some MCP clients look for an icon at the root.
+app.get('/favicon.ico', (c) =>
+  c.env.ASSETS.fetch(new Request(new URL('/assets/brand/inkloop-v2.png', c.req.url))),
+);
 app.use('/auth/*', authRateLimit, sameOriginMutation);
 app.get('/auth/password', (c) => passwordParams(c.env, c.get('authState')));
 app.post('/auth/setup', (c) => setup(c.req.raw, c.env, c.get('authState')));

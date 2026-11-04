@@ -381,6 +381,177 @@ test('Hono SPA routing, direct static assets, owner sessions and OAuth lifecycle
     const largeToken = await request('/oauth/token', { method: 'POST', body: 'x'.repeat(65537) });
     assert.equal(largeToken.status, 413);
     assert.equal((await largeToken.json()).error, 'invalid_request');
+
+    // Discovery advertises read and write, so clients request both by default.
+    const challenge401 = await request('/mcp', { method: 'POST' });
+    assert.match(challenge401.headers.get('www-authenticate'), /scope="mcp:read mcp:write"/);
+    const resourceMetadata = await (
+      await request('/.well-known/oauth-protected-resource/mcp')
+    ).json();
+    assert.equal(resourceMetadata.resource, origin + '/mcp');
+    assert.deepEqual(resourceMetadata.scopes_supported, ['mcp:read', 'mcp:write']);
+
+    // RFC 8707 resource indicators: the one identifier is origin + '/mcp'. Identical repeats
+    // collapse; different values, and any other resource (including the bare origin), fail.
+    const resourcePeer = { 'CF-Connecting-IP': '192.0.2.77' };
+    const withResources = (resources) => {
+      const next = new URLSearchParams(query);
+      next.delete('resource');
+      for (const value of resources) next.append('resource', value);
+      return next.toString();
+    };
+    const prepareFor = (resources) =>
+      request('/auth/consent', {
+        method: 'POST',
+        headers: { ...mutation, ...resourcePeer },
+        body: JSON.stringify({ query: withResources(resources) }),
+      });
+    for (const resources of [[origin + '/mcp'], [origin + '/mcp', origin + '/mcp']]) {
+      const prepared = await prepareFor(resources);
+      assert.equal(prepared.status, 200, JSON.stringify(resources));
+      assert.equal((await prepared.json()).resource, origin + '/mcp');
+    }
+    for (const resources of [
+      [origin + '/mcp', 'https://evil.example/mcp'],
+      [origin + '/'],
+      [origin + '/', origin + '/mcp'],
+      [origin + '/other'],
+      [origin + '/mcp/'],
+      ['https://evil.example/'],
+    ]) {
+      const rejected = await prepareFor(resources);
+      assert.equal(rejected.status, 400, JSON.stringify(resources));
+      const body = await rejected.json();
+      assert.equal(body.error, 'invalid_target', JSON.stringify(resources));
+      assert.match(body.message, /doesn't host/);
+      assert.ok(body.message.includes(origin + '/mcp'), 'names the expected resource');
+      // The error goes back to the validated loopback callback, not just to this page.
+      const back = new URL(body.redirectTo);
+      assert.equal(back.origin + back.pathname, redirectUri);
+      assert.equal(back.searchParams.get('error'), 'invalid_target');
+    }
+    const unknownClient = await request('/auth/consent', {
+      method: 'POST',
+      headers: { ...mutation, ...resourcePeer },
+      body: JSON.stringify({ query: 'response_type=code&client_id=unknown' }),
+    });
+    assert.equal((await unknownClient.json()).error, 'invalid_request');
+
+    // Code exchange and refresh: identical repeats are accepted, mismatches are invalid_target.
+    const codeFor = async (resources) => {
+      const prepared = await prepareFor(resources);
+      const consentData = await prepared.json();
+      const cookies = prepared.headers
+        .getSetCookie()
+        .map((cookie) => cookie.split(';')[0])
+        .join('; ');
+      const approval = await request('/authorize', {
+        method: 'POST',
+        headers: {
+          cookie: auth.cookie + '; ' + cookies,
+          Origin: origin,
+          'Content-Type': 'application/x-www-form-urlencoded',
+          ...resourcePeer,
+        },
+        body: new URLSearchParams([
+          ['handle', consentData.handle],
+          ['scope', 'mcp:read'],
+          ['scope', 'mcp:write'],
+          ['scope', 'offline_access'],
+          ['decision', 'approve'],
+        ]),
+      });
+      assert.equal(approval.status, 200);
+      return new URL((await approval.json()).redirectTo).searchParams.get('code');
+    };
+    const tokenRequest = (params) =>
+      request('/oauth/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded', ...resourcePeer },
+        body: new URLSearchParams(params),
+      });
+    const exchangeFor = (code, resources) =>
+      tokenRequest([
+        ['grant_type', 'authorization_code'],
+        ['code', code],
+        ['client_id', client.client_id],
+        ['redirect_uri', redirectUri],
+        ['code_verifier', verifier],
+        ...resources.map((value) => ['resource', value]),
+      ]);
+    const mismatch = await exchangeFor(await codeFor([origin + '/mcp']), [
+      origin + '/mcp',
+      'https://evil.example/mcp',
+    ]);
+    assert.equal(mismatch.status, 400);
+    assert.equal((await mismatch.json()).error, 'invalid_target');
+    const aliased = await exchangeFor(await codeFor([origin + '/mcp']), [
+      origin + '/mcp',
+      origin + '/mcp',
+    ]);
+    assert.equal(aliased.status, 200, await aliased.clone().text());
+    const aliasTokens = await aliased.json();
+    assert.deepEqual(aliasTokens.scope.split(' ').sort(), [
+      'mcp:read',
+      'mcp:write',
+      'offline_access',
+    ]);
+    const mcpCall = (accessToken, method = 'tools/list', params = {}) =>
+      request('/mcp', {
+        method: 'POST',
+        headers: {
+          Authorization: 'Bearer ' + accessToken,
+          'Content-Type': 'application/json',
+          Accept: 'application/json, text/event-stream',
+          'MCP-Protocol-Version': '2025-11-25',
+        },
+        body: JSON.stringify({ jsonrpc: '2.0', id: 3, method, params }),
+      });
+    // The token's audience is the resource: /mcp accepts it.
+    assert.equal((await mcpCall(aliasTokens.access_token)).status, 200);
+    const refresh = (resources) =>
+      tokenRequest([
+        ['grant_type', 'refresh_token'],
+        ['refresh_token', aliasTokens.refresh_token],
+        ['client_id', client.client_id],
+        ...resources.map((value) => ['resource', value]),
+      ]);
+    const foreignRefresh = await refresh([origin + '/other']);
+    assert.equal(foreignRefresh.status, 400);
+    assert.equal((await foreignRefresh.json()).error, 'invalid_target');
+    assert.equal(
+      (await refresh([origin + '/'])).status,
+      400,
+      'the bare origin is not the resource',
+    );
+    const refreshed = await refresh([origin + '/mcp']);
+    assert.equal(refreshed.status, 200, await refreshed.clone().text());
+    const refreshedTokens = await refreshed.json();
+    assert.equal((await mcpCall(refreshedTokens.access_token)).status, 200);
+    const created = await mcpCall(refreshedTokens.access_token, 'tools/call', {
+      name: 'create_problems',
+      arguments: {
+        request_id: 'oauth-write',
+        new_set: { title: 'Set', new_collection_title: 'Course' },
+        problems: [{ title: 'Q', body: 'B' }],
+      },
+    });
+    assert.equal((await created.json()).result.isError, undefined, 'write scope works');
+    // Revoking the grants stops their tokens at once. (Each authorization above made its own grant.)
+    const writeGrants = (
+      await (await request('/api/grants', { headers: auth })).json()
+    ).items.filter((item) => item.scope.includes('mcp:write'));
+    assert.ok(writeGrants.length >= 1);
+    for (const grant of writeGrants) {
+      const revoked = await request('/api/grants/revoke', {
+        method: 'POST',
+        headers: { ...mutation, ...resourcePeer },
+        body: JSON.stringify({ grantId: grant.id }),
+      });
+      assert.equal(revoked.status, 200);
+    }
+    assert.equal((await mcpCall(refreshedTokens.access_token)).status, 401);
+    assert.equal((await refresh([origin + '/mcp'])).status, 400);
     // Use a separate IP to exercise setup throttling independently of OAuth traffic.
     let limited;
     for (let i = 0; i < 61; i++)

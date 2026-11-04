@@ -91,12 +91,26 @@ test('deployment builds before migrations and stops entirely on build failure', 
   assert.equal(deploy([], failed.execute), 2);
   assert.equal(failed.calls.length, 1);
   assert.match(failed.calls[0].args[0], /\/build\.mjs$/);
-  const success = runner([]);
+  const success = runner([
+    { status: 0 },
+    { status: 0 },
+    { status: 0, stdout: JSON.stringify({ accounts: [{ id: 'acct' }] }) },
+    { status: 0, stdout: JSON.stringify([{ name: 'inkloop-db', uuid: 'db-uuid' }]) },
+  ]);
   assert.equal(deploy([], success.execute), 0);
-  assert.equal(success.calls.length, 3);
+  assert.equal(success.calls.length, 5);
   assert.match(success.calls[0].args[0], /\/build\.mjs$/);
   assert.deepEqual(success.calls[1].args, ['d1', 'migrations', 'apply', 'DB', '--remote']);
-  assert.deepEqual(success.calls[2].args, ['deploy', '--experimental-auto-create']);
+  assert.deepEqual(success.calls[4].args, [
+    'deploy',
+    '--experimental-auto-create',
+    '--var',
+    'D1_CONSOLE_URL:https://dash.cloudflare.com/acct/workers/d1/databases/db-uuid/studio',
+  ]);
+  // A failed lookup never blocks the deployment; the link is just omitted.
+  const lookupFails = runner([{ status: 0 }, { status: 0 }, { status: 1 }, { status: 1 }]);
+  assert.equal(deploy([], lookupFails.execute), 0);
+  assert.deepEqual(lookupFails.calls.at(-1).args, ['deploy', '--experimental-auto-create']);
 });
 
 test('deployment fails closed on migration errors, including after initial provisioning', () => {

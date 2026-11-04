@@ -121,7 +121,52 @@ test('MCP input validators accept and reject exactly what the zod contracts do',
     ],
     parseGetSubmission: [
       schemas.getSubmissionInput,
-      [{ problem_id: 'p' }, {}, { problem_id: 'x'.repeat(101) }, { problem_id: 1 }],
+      [
+        { problem_id: 'x'.repeat(101) },
+        { problem_id: 1 },
+        { problem_id: 'p' },
+        { problem_id: 'p', snapshot_id: 's' },
+        { problem_id: 'p', snapshot_id: '' },
+        {},
+      ],
+    ],
+    parseGetProblem: [schemas.getProblemInput, [{ problem_id: 'p' }, { problem_id: 7 }]],
+    parseListCollections: [schemas.listCollectionsInput, [{}, { extra: 1 }, []]],
+    parseUpdateProblem: [
+      schemas.updateProblemInput,
+      [
+        { problem_id: 'p', title: 'T' },
+        { problem_id: 'p', body: 'B', type: null },
+        { problem_id: 'p', type: 'Proofs' },
+        { problem_id: 'p' },
+        { problem_id: 'p', title: '' },
+        { problem_id: 'p', type: '' },
+        { problem_id: 'p', body: 'x'.repeat(20001) },
+        { title: 'T' },
+      ],
+    ],
+    parseDeleteProblems: [
+      schemas.deleteProblemsInput,
+      [
+        { problem_ids: ['a', 'b'] },
+        { problem_ids: [] },
+        { problem_ids: Array(51).fill('a') },
+        { problem_ids: [''] },
+        { problem_ids: 'a' },
+      ],
+    ],
+    parseUpdateProblemSet: [
+      schemas.updateProblemSetInput,
+      [{ set_id: 's', title: 'T' }, { set_id: 's', title: '' }, { title: 'T' }],
+    ],
+    parseUpdateCollection: [
+      schemas.updateCollectionInput,
+      [{ collection_id: 'c', title: 'T' }, { collection_id: 'c' }],
+    ],
+    parseDeleteProblemSet: [schemas.deleteProblemSetInput, [{ set_id: 's' }, {}]],
+    parseDeleteCollection: [
+      schemas.deleteCollectionInput,
+      [{ collection_id: 'c' }, { collection_id: '' }],
     ],
     parseAppendFeedback: [
       schemas.appendFeedbackInput,

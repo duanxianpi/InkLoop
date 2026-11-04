@@ -81,6 +81,9 @@ const mf = new Miniflare(
       run_worker_first: ['/*', '!/assets/*'],
       assetConfig: { html_handling: 'none', not_found_handling: 'none' },
     },
+    bindings: process.env.PREVIEW_D1_CONSOLE_URL
+      ? { D1_CONSOLE_URL: process.env.PREVIEW_D1_CONSOLE_URL }
+      : {},
     host: 'localhost',
     port,
   }),
@@ -88,6 +91,11 @@ const mf = new Miniflare(
 await mf.ready;
 const db = await mf.getD1Database('DB');
 await applyMigrations(db);
+// PREVIEW_FRESH=1: a deployment nobody has set up yet, to look at /setup.
+if (process.env.PREVIEW_FRESH) {
+  console.log(`Fresh preview: ${origin}/setup`);
+  await new Promise(() => {});
+}
 await db.prepare('INSERT INTO owner VALUES(1,unixepoch())').run();
 await db
   .prepare(

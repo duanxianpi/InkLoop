@@ -1,7 +1,10 @@
 import type {
   AppendFeedbackInput,
   CreateProblemsInput,
+  DeleteProblemsInput,
+  GetSubmissionInput,
   ListProblemsInput,
+  UpdateProblemInput,
 } from '../../shared/schemas';
 import { LIMITS } from '../../shared/limits';
 import { HttpError } from '../http/errors';
@@ -106,9 +109,74 @@ export function parseListProblems(raw: unknown): ListProblemsInput {
   };
 }
 
-export function parseGetSubmission(raw: unknown): { problem_id: string } {
+export function parseGetSubmission(raw: unknown): GetSubmissionInput {
+  const input = object(raw, 'arguments');
+  return {
+    problem_id: id('problem_id')(input.problem_id),
+    snapshot_id: optional(input.snapshot_id, id('snapshot_id')),
+  };
+}
+
+export function parseGetProblem(raw: unknown): { problem_id: string } {
   const input = object(raw, 'arguments');
   return { problem_id: id('problem_id')(input.problem_id) };
+}
+
+export function parseListCollections(raw: unknown): Record<string, never> {
+  object(raw, 'arguments');
+  return {};
+}
+
+export function parseUpdateProblem(raw: unknown): UpdateProblemInput {
+  const input = object(raw, 'arguments');
+  const parsed = {
+    problem_id: id('problem_id')(input.problem_id),
+    title: optional(input.title, (value) => string(value, 'title', 1, LIMITS.titleLength)),
+    body: optional(input.body, (value) => string(value, 'body', 1, LIMITS.bodyLength)),
+    // null removes the category, as with zod's .nullable().optional().
+    type:
+      input.type === null
+        ? null
+        : optional(input.type, (value) => string(value, 'type', 1, LIMITS.typeLength)),
+  };
+  if (parsed.title === undefined && parsed.body === undefined && parsed.type === undefined)
+    fail('arguments', 'provide at least one of title, body or type');
+  return parsed;
+}
+
+export function parseDeleteProblems(raw: unknown): DeleteProblemsInput {
+  const input = object(raw, 'arguments');
+  return {
+    problem_ids: array(input.problem_ids, 'problem_ids', 1, LIMITS.createProblemsBatch).map(
+      (value, index) => id(`problem_ids.${index}`)(value),
+    ),
+  };
+}
+
+export function parseUpdateProblemSet(raw: unknown): { set_id: string; title: string } {
+  const input = object(raw, 'arguments');
+  return {
+    set_id: id('set_id')(input.set_id),
+    title: string(input.title, 'title', 1, LIMITS.titleLength),
+  };
+}
+
+export function parseUpdateCollection(raw: unknown): { collection_id: string; title: string } {
+  const input = object(raw, 'arguments');
+  return {
+    collection_id: id('collection_id')(input.collection_id),
+    title: string(input.title, 'title', 1, LIMITS.titleLength),
+  };
+}
+
+export function parseDeleteProblemSet(raw: unknown): { set_id: string } {
+  const input = object(raw, 'arguments');
+  return { set_id: id('set_id')(input.set_id) };
+}
+
+export function parseDeleteCollection(raw: unknown): { collection_id: string } {
+  const input = object(raw, 'arguments');
+  return { collection_id: id('collection_id')(input.collection_id) };
 }
 
 export function parseAppendFeedback(raw: unknown): AppendFeedbackInput {

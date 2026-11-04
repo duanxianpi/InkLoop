@@ -1,3 +1,4 @@
+import { AuthorizationError, CimdFetchError } from '@cloudflare/workers-oauth-provider';
 import { assert, json, now, random, type Env, type OwnerSession } from './common';
 import { boundedJsonObject, boundedText } from '../http/body';
 import { LIMITS } from '../../shared/limits';
@@ -13,7 +14,12 @@ export async function prepareConsent(request: Request, env: Env, origin: string)
   );
   const url = new URL('/authorize', origin);
   url.search = data.query;
-  const authRequest = await env.OAUTH_PROVIDER.parseAuthRequest(new Request(url));
+  let authRequest;
+  try {
+    authRequest = await env.OAUTH_PROVIDER.parseAuthRequest(new Request(url));
+  } catch (error) {
+    return consentError(error, url, origin);
+  }
   const detail = await env.OAUTH_PROVIDER.describeConsent(authRequest);
   const consent = await env.OAUTH_PROVIDER.beginConsent(authRequest);
   const result: ConsentData = {
@@ -26,6 +32,36 @@ export async function prepareConsent(request: Request, env: Env, origin: string)
     handle: consent.handle,
   };
   return json(result, 200, consent.headers);
+}
+
+/**
+ * An authorization request the page cannot show, explained by cause. `redirectTo`, present once the
+ * client and its redirect URI were validated, returns the error to the app (RFC 6749 §4.1.2.1).
+ * Only request parameters are echoed; no credential is part of an authorization request.
+ */
+function consentError(error: unknown, url: URL, origin: string) {
+  if (error instanceof CimdFetchError)
+    return json(
+      {
+        error: 'client_metadata_unavailable',
+        message: `Couldn't load this app's registration from ${error.metadataUrl}. Try connecting again; if it keeps failing, the app's client metadata is unavailable.`,
+      },
+      400,
+    );
+  if (!(error instanceof AuthorizationError)) throw error;
+  const resources = [...new Set(url.searchParams.getAll('resource'))];
+  const message =
+    error.code === 'invalid_target'
+      ? `This app asked for access to ${resources.join(' and ') || 'an unspecified resource'}, which this server doesn't host. InkLoop's MCP resource is ${origin}/mcp: check the MCP URL configured in the app.`
+      : error.description === 'Invalid redirect URI'
+        ? "The app's redirect address isn't registered for this app, so the request was refused."
+        : error.description === 'Invalid client_id' || error.description === 'client_id is required'
+          ? "The app didn't identify itself with a known client ID, so the request was refused."
+          : `The app sent an authorization request this server can't accept: ${error.description}.`;
+  return json(
+    { error: error.code, message, ...(error.redirectTo ? { redirectTo: error.redirectTo } : {}) },
+    400,
+  );
 }
 
 export async function submitConsent(request: Request, env: Env, user: OwnerSession) {

@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import type { AuthPageData, ConsentData, PasswordParams } from '../../shared/auth';
 import { newCredential, stretch } from './password';
+import { BRAND_ICON, CopyRow, mcpUrl } from '../design/Copy';
 
 async function post<T = unknown>(path: string, value: unknown) {
   const response = await fetch(path, {
@@ -13,14 +14,17 @@ async function post<T = unknown>(path: string, value: unknown) {
   return data;
 }
 
-function Layout({ title, children }: { title: string; children: ReactNode }) {
+export function Layout({ title, children }: { title: string; children: ReactNode }) {
   return (
     <main className="auth-page">
-      <a className="brand" href="/app">
-        InkLoop
-      </a>
-      <h1>{title}</h1>
-      {children}
+      <div className="auth-card">
+        <a className="brand" href="/app">
+          <img src={BRAND_ICON} alt="" />
+          InkLoop
+        </a>
+        <h1>{title}</h1>
+        {children}
+      </div>
     </main>
   );
 }
@@ -136,81 +140,128 @@ function PasswordPage({ data }: { data: Extract<AuthPageData, { kind: 'password'
     }
   }
 
+  const keyName = purpose === 'setup' ? 'claim' : 'recovery';
+  const query = `SELECT secret_display FROM admin_keys WHERE purpose = '${
+    purpose === 'setup' ? 'bootstrap' : 'recovery'
+  }';`;
+  const passwordFields = (
+    <>
+      {purpose === 'change' && (
+        <PasswordField
+          label="Current password"
+          value={current}
+          onChange={setCurrent}
+          autoComplete="current-password"
+          disabled={busy}
+        />
+      )}
+      <PasswordField
+        label={choosing ? 'New password' : 'Password'}
+        value={password}
+        onChange={setPassword}
+        autoComplete={choosing ? 'new-password' : 'current-password'}
+        disabled={busy}
+      />
+      {choosing && (
+        <>
+          <PasswordField
+            label="Repeat the new password"
+            value={repeat}
+            onChange={setRepeat}
+            autoComplete="new-password"
+            disabled={busy}
+          />
+          <p className="hint">
+            Any password works. A longer one, such as a few unrelated words, is much harder to
+            guess.
+            {password && password.length < 8 && ' This one is short.'}
+          </p>
+        </>
+      )}
+    </>
+  );
+
   return (
     <Layout title={title}>
-      {needsKey && (
-        <p>
-          In the Cloudflare Dashboard, open this Worker’s <strong>DB</strong> binding, then the{' '}
-          <strong>admin_keys</strong> table. Copy <code>secret_display</code> for{' '}
-          <code>{purpose === 'setup' ? 'bootstrap' : 'recovery'}</code>. It is never shown by this
-          website.
-        </p>
+      {purpose === 'setup' && (
+        <p>Claim this deployment as its owner. It takes a minute and only happens once.</p>
       )}
       {purpose === 'recovery' && (
-        <p>
-          Resetting the password signs out every device and disconnects every AI app. A new recovery
-          key will be available only in D1.
+        <p className="facts">
+          Resetting the password signs out every device and disconnects every AI app. Afterwards the
+          recovery key is replaced by a new one, again stored only in D1.
         </p>
       )}
       <form onSubmit={submit} aria-busy={busy}>
         {/* Lets password managers save the password for this deployment. */}
         <input type="text" name="username" autoComplete="username" value="owner" readOnly hidden />
-        {needsKey && (
-          <label>
-            Owner {purpose === 'setup' ? 'claim' : 'recovery'} key
-            <input
-              type="password"
-              autoComplete="off"
-              required
-              value={key}
-              onChange={(e) => setKey(e.target.value)}
-              disabled={busy}
-            />
-          </label>
-        )}
-        {purpose === 'change' && (
-          <PasswordField
-            label="Current password"
-            value={current}
-            onChange={setCurrent}
-            autoComplete="current-password"
-            disabled={busy}
-          />
-        )}
-        <PasswordField
-          label={choosing ? 'New password' : 'Password'}
-          value={password}
-          onChange={setPassword}
-          autoComplete={choosing ? 'new-password' : 'current-password'}
-          disabled={busy}
-        />
-        {choosing && (
-          <>
-            <PasswordField
-              label="Repeat the new password"
-              value={repeat}
-              onChange={setRepeat}
-              autoComplete="new-password"
-              disabled={busy}
-            />
-            <p className="hint">
-              Any password works. A longer one, such as a few unrelated words, is much harder to
-              guess.
-              {password && password.length < 8 && ' This one is short.'}
-            </p>
-          </>
-        )}
-        {purpose === 'setup' && (
-          <label className="check">
-            <input
-              type="checkbox"
-              required
-              checked={confirmed}
-              onChange={(e) => setConfirmed(e.target.checked)}
-              disabled={busy}
-            />{' '}
-            Use <code>{origin}</code> as this deployment’s permanent sign-in and OAuth address.
-          </label>
+        {needsKey ? (
+          <ol className="steps">
+            <li>
+              <h2>Find your {keyName} key</h2>
+              <p>
+                It is stored only in this deployment’s Cloudflare D1 database and never shown by
+                this website.{' '}
+                {data.d1ConsoleUrl ? (
+                  <a href={data.d1ConsoleUrl} target="_blank" rel="noreferrer">
+                    Open the database in Cloudflare
+                  </a>
+                ) : (
+                  <>
+                    <a
+                      href="https://dash.cloudflare.com/?to=/:account/workers/d1"
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      Open D1 in Cloudflare
+                    </a>
+                    , choose the database (usually <code>inkloop-db</code>), then Studio
+                  </>
+                )}{' '}
+                and run:
+              </p>
+              <CopyRow text={query} />
+              <p className="hint">Copy the value shown in the secret_display column.</p>
+            </li>
+            <li>
+              <h2>Paste it here</h2>
+              <label>
+                {keyName === 'claim' ? 'Claim' : 'Recovery'} key
+                <input
+                  type="password"
+                  autoComplete="off"
+                  required
+                  value={key}
+                  onChange={(e) => setKey(e.target.value)}
+                  disabled={busy}
+                />
+              </label>
+            </li>
+            <li>
+              <h2>{purpose === 'setup' ? 'Choose a password' : 'Choose a new password'}</h2>
+              {passwordFields}
+            </li>
+            {purpose === 'setup' && (
+              <li>
+                <h2>Confirm this address</h2>
+                <label className="check">
+                  <input
+                    type="checkbox"
+                    required
+                    checked={confirmed}
+                    onChange={(e) => setConfirmed(e.target.checked)}
+                    disabled={busy}
+                  />
+                  <span>
+                    Use <code>{origin}</code> as this deployment’s permanent sign-in and AI app
+                    address.
+                  </span>
+                </label>
+              </li>
+            )}
+          </ol>
+        ) : (
+          passwordFields
         )}
         <button disabled={busy}>
           {busy
@@ -218,7 +269,7 @@ function PasswordPage({ data }: { data: Extract<AuthPageData, { kind: 'password'
               ? 'Signing in…'
               : 'Saving…'
             : {
-                setup: 'Set up',
+                setup: 'Set up InkLoop',
                 login: 'Sign in',
                 recovery: 'Reset password',
                 change: 'Change password',
@@ -228,14 +279,15 @@ function PasswordPage({ data }: { data: Extract<AuthPageData, { kind: 'password'
       <p role="status" aria-live="polite">
         {status}
       </p>
-      <p>
+      <p className="foot">
         {purpose === 'change' ? (
           <a href="/app">Back to whiteboard</a>
         ) : (
           <>
             {purpose !== 'login' && (
               <>
-                <a href="/login">Sign in</a> ·{' '}
+                <a href="/login">Sign in</a>
+                {purpose !== 'recovery' && ' · '}
               </>
             )}
             {purpose !== 'recovery' && <a href="/recover">Forgot your password?</a>}
@@ -248,6 +300,14 @@ function PasswordPage({ data }: { data: Extract<AuthPageData, { kind: 'password'
 }
 
 type Grant = { id: string; clientId: string; scope: string[]; createdAt: number };
+/** A CIMD client ID is a URL; its host names the app better than the whole address. */
+const appName = (clientId: string) => {
+  try {
+    return new URL(clientId).host;
+  } catch {
+    return clientId;
+  }
+};
 function Connections() {
   const [grants, setGrants] = useState<Grant[]>([]);
   const [status, setStatus] = useState('Loading applications…');
@@ -294,33 +354,52 @@ function Connections() {
     }
   }
   return (
-    <Layout title="Connected applications">
+    <Layout title="Connected AI apps">
+      <h2>MCP server URL</h2>
       <p>
-        Only applications you explicitly approve can use MCP. Revoking one does not sign you out of
-        the Web App.
+        Add this address to your AI app (Claude, ChatGPT, Codex…) as a remote MCP server. The app
+        then asks you to sign in here and approve it.
       </p>
-      <ul>
-        {grants.map((grant) => (
-          <li key={grant.id}>
-            <p>
-              <strong>{grant.clientId}</strong>
-              <br />
-              {grant.scope.join(', ')}
-            </p>
-            <button disabled={pending !== null} onClick={() => void revoke(grant.id)}>
-              {pending === grant.id ? 'Revoking…' : 'Revoke'}
-            </button>
-          </li>
-        ))}
-      </ul>
-      <p role="status">{status}</p>
+      <CopyRow text={mcpUrl()} />
+      <h2 style={{ marginTop: 26 }}>Connected</h2>
       <p>
-        <a href="/login?returnTo=%2Fsettings%2Fconnected-apps">Sign in again</a> ·{' '}
-        <a href="/app">Back to whiteboard</a>
+        Only apps you approve can use InkLoop. Revoking one does not sign you out of the whiteboard.
+      </p>
+      {grants.length > 0 && (
+        <ul className="rows">
+          {grants.map((grant) => (
+            <li key={grant.id}>
+              <p>
+                <strong>{appName(grant.clientId)}</strong>
+                <small>
+                  {grant.scope.map((scope) => SCOPE_LABELS[scope] ?? scope).join(' · ')}
+                </small>
+              </p>
+              <button
+                className="secondary small"
+                disabled={pending !== null}
+                onClick={() => void revoke(grant.id)}
+              >
+                {pending === grant.id ? 'Revoking…' : 'Revoke'}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <p role="status">{status}</p>
+      <p className="foot">
+        <a href="/app">Back to whiteboard</a> ·{' '}
+        <a href="/login?returnTo=%2Fsettings%2Fconnected-apps">Sign in again</a>
       </p>
     </Layout>
   );
 }
+
+const SCOPE_LABELS: Record<string, string> = {
+  'mcp:read': 'Read problems, submitted answers and feedback',
+  'mcp:write': 'Create problems and give feedback',
+  offline_access: 'Stay connected without asking again',
+};
 
 function Consent({ data }: { data: ConsentData }) {
   const [busy, setBusy] = useState(false);
@@ -356,27 +435,29 @@ function Consent({ data }: { data: ConsentData }) {
     }
   }
   return (
-    <Layout title="Authorize application">
+    <Layout title="Connect an AI app">
       <p>
-        <strong>{data.clientName}</strong> requests access to your whiteboard.
+        <strong>{data.clientName}</strong> wants to use your whiteboard.
       </p>
-      <p>
-        {data.clientDomain ? (
-          <>
-            Client domain: <strong>{data.clientDomain}</strong>
-          </>
-        ) : (
-          'Self-registered client; its name is not verified.'
-        )}
-      </p>
-      <p>
-        Redirect destination: <strong>{data.redirectHost}</strong>
-        {data.redirectIsLoopback &&
-          ' — an application on your computer. Only continue if you started this connection.'}
-      </p>
-      <p>
-        Resource: <code>{data.resource}</code>
-      </p>
+      <div className="facts">
+        <p>
+          {data.clientDomain ? (
+            <>
+              App: <strong>{data.clientDomain}</strong>
+            </>
+          ) : (
+            'Self-registered app; its name is not verified.'
+          )}
+        </p>
+        <p>
+          Returns to: <strong>{data.redirectHost}</strong>
+          {data.redirectIsLoopback &&
+            ' (an app on your computer; only continue if you started this connection)'}
+        </p>
+        <p>
+          Server: <code>{data.resource}</code>
+        </p>
+      </div>
       <form onSubmit={submit} aria-busy={busy}>
         <input type="hidden" name="handle" value={data.handle} />
         {data.scopes.map((scope) => (
@@ -388,8 +469,11 @@ function Consent({ data }: { data: ConsentData }) {
               defaultChecked
               disabled={busy || scope === 'mcp:read'}
             />
-            {scope === 'mcp:read' && <input type="hidden" name="scope" value={scope} />} {scope}
-            {scope === 'mcp:read' ? ' (required)' : ''}
+            {scope === 'mcp:read' && <input type="hidden" name="scope" value={scope} />}
+            <span>
+              {SCOPE_LABELS[scope] ?? scope}
+              {scope === 'mcp:read' ? ' (required)' : ''} <code>{scope}</code>
+            </span>
           </label>
         ))}
         <div className="actions">

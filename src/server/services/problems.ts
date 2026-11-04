@@ -327,7 +327,7 @@ export function problemService(ctx: AppContext) {
       const [collections, sets] = await ctx.db.batch<never>([
         ctx.db.prepare('SELECT id, title FROM collections ORDER BY created_at, id'),
         ctx.db.prepare(
-          'SELECT id, collection_id, title, sort_order FROM problem_sets ORDER BY sort_order',
+          'SELECT s.id, s.collection_id, s.title, s.sort_order, (SELECT COUNT(*) FROM problems p WHERE p.set_id = s.id) AS problem_count FROM problem_sets s ORDER BY s.sort_order',
         ),
       ]);
       return (collections.results as { id: string; title: string }[]).map((collection) => ({

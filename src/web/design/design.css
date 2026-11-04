@@ -1,0 +1,377 @@
+/* InkLoop design language (Paper): one set of tokens for the board and the account pages.
+   Components only use the tokens.
+   Sizes in components are written at full scale; the board's chrome and the account cards are both
+   drawn at --chrome-scale, so a button is the same size everywhere. */
+
+:root {
+  /* Paper: the approved canvas POC. Warm paper, dot grid, teal ink (#216A63, the brand green). */
+  --board: #fafaf8;
+  --surface: #ffffff;
+  --line: #e3e3de;
+  --line-soft: #f0f0eb;
+  --tile-line: #e6e6e0;
+  --dot: #dcdcd5;
+  --pattern: radial-gradient(circle, var(--dot) 1.1px, transparent 1.4px);
+  --ink: #17191c;
+  --ink-2: #3d434a;
+  --muted: #5f6670;
+  --faint: #8a8f96;
+  --off: #b4b8bd;
+  --track: #d3d6da;
+  --accent: #216a63;
+  --accent-soft: #e3eeeb;
+  --on-accent: #ffffff;
+  --empty: #f1f1ec;
+  --soft: #f3f3ef;
+  --toast: rgba(23, 25, 28, 0.82);
+  --ok: #3b7a2a;
+  --ok-soft: #eaf2e2;
+  --ok-line: #cfe0c0;
+  --ok-ink: #2d5e20;
+  --ok-note: #264f1b;
+  --partial: #a15c00;
+  --partial-soft: #fbf0e0;
+  --partial-line: #ebd9bc;
+  --partial-ink: #6b4100;
+  --partial-note: #5a3600;
+  --bad: #b93a26;
+  --bad-soft: #fbe7e3;
+  --bad-line: #f0cfc7;
+  --bad-ink: #8a2a1b;
+  --bad-note: #6e2416;
+  --sh1: 0 1px 2px rgba(17, 24, 39, 0.05), 0 6px 18px rgba(17, 24, 39, 0.07);
+  --sh2: 0 2px 4px rgba(17, 24, 39, 0.05), 0 16px 40px rgba(17, 24, 39, 0.12);
+  --ui: Inter, -apple-system, 'SF Pro Text', system-ui, sans-serif;
+  --q: 'STIX Two Text', 'Times New Roman', Times, serif;
+  --r-s: 10px;
+  --r-m: 12px;
+  --r-l: 16px;
+  --r-xl: 20px;
+  --w-strong: 600;
+  --chrome-scale: 0.8;
+}
+
+:root {
+  --sat: env(safe-area-inset-top, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px);
+  --sar: env(safe-area-inset-right, 0px);
+  --row2: calc(72px + var(--sat));
+  color-scheme: light;
+}
+
+/* ------------------------------------------------------------------ account pages */
+
+body:has(.auth-page) {
+  margin: 0;
+  background: var(--board);
+}
+.auth-page {
+  min-height: 100vh;
+  box-sizing: border-box;
+  padding: max(6vh, 24px) 16px 48px;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  background-color: var(--board);
+  background-image: var(--pattern);
+  background-size: 28px 28px;
+  font-family: var(--ui);
+  color: var(--ink);
+  color-scheme: light;
+}
+.auth-page,
+.auth-page * {
+  box-sizing: border-box;
+}
+.auth-card {
+  zoom: var(--chrome-scale);
+  width: min(600px, calc((100vw - 32px) / var(--chrome-scale)));
+  padding: 30px 36px 32px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-xl);
+  box-shadow: var(--sh2);
+  font-size: 17px;
+  line-height: 1.55;
+}
+.auth-card .brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 15px;
+  font-weight: var(--w-strong);
+  color: var(--muted);
+  text-decoration: none;
+  letter-spacing: 0.01em;
+}
+.auth-card .brand img {
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+}
+.auth-card h1 {
+  margin: 22px 0 10px;
+  font-size: 30px;
+  line-height: 1.2;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+.auth-card h2 {
+  margin: 0 0 6px;
+  font-size: 17px;
+  font-weight: var(--w-strong);
+}
+.auth-card p {
+  margin: 0 0 14px;
+  color: var(--ink-2);
+  overflow-wrap: anywhere;
+}
+.auth-card a {
+  color: var(--accent);
+  font-weight: 500;
+}
+.auth-card code {
+  font:
+    0.88em ui-monospace,
+    'SF Mono',
+    Menlo,
+    monospace;
+  background: var(--soft);
+  border-radius: 6px;
+  padding: 2px 6px;
+  overflow-wrap: anywhere;
+}
+.auth-card label {
+  display: block;
+  margin: 18px 0;
+  font-size: 15px;
+  font-weight: var(--w-strong);
+  color: var(--ink-2);
+}
+.auth-card input[type='password'],
+.auth-card input[type='text'] {
+  display: block;
+  width: 100%;
+  height: 50px;
+  margin-top: 8px;
+  padding: 0 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-m);
+  background: var(--surface);
+  color: var(--ink);
+  font: 400 17px var(--ui);
+  outline: none;
+}
+.auth-card input[hidden] {
+  display: none;
+}
+.auth-card input:focus-visible {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.auth-card .check {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  min-height: 44px;
+  font-weight: 400;
+  color: var(--ink);
+}
+.auth-card .check input {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  margin: 3px 0 0;
+  accent-color: var(--accent);
+}
+.auth-card .check code {
+  font-size: 0.82em;
+}
+.auth-card .hint {
+  margin: -8px 0 18px;
+  font-size: 14px;
+  color: var(--muted);
+}
+.auth-card button,
+.auth-card .button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 50px;
+  padding: 0 22px;
+  border: 1px solid var(--accent);
+  border-radius: var(--r-m);
+  background: var(--accent);
+  color: var(--on-accent);
+  font: var(--w-strong) 17px var(--ui);
+  text-decoration: none;
+  cursor: pointer;
+}
+.auth-card button.secondary,
+.auth-card .button.secondary {
+  background: var(--surface);
+  border-color: var(--line);
+  color: var(--ink);
+}
+.auth-card button.small {
+  min-height: 38px;
+  padding: 0 14px;
+  font-size: 15px;
+}
+.auth-card button:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+.auth-card button:focus-visible,
+.auth-card a:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.auth-card form > button {
+  width: 100%;
+  margin-top: 6px;
+}
+.auth-card .actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 8px;
+}
+.auth-card .actions button {
+  flex: 1;
+}
+.auth-card [role='status'] {
+  min-height: 1.5em;
+  margin: 14px 0 0;
+  color: var(--muted);
+}
+.auth-card .foot {
+  margin: 18px 0 0;
+  padding-top: 16px;
+  border-top: 1px solid var(--line-soft);
+  font-size: 15px;
+  color: var(--muted);
+}
+.auth-card ul.rows {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--r-l);
+  overflow: hidden;
+}
+.auth-card ul.rows li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 16px;
+  border-top: 1px solid var(--line-soft);
+}
+.auth-card ul.rows li:first-child {
+  border-top: 0;
+}
+.auth-card ul.rows p {
+  margin: 0;
+}
+.auth-card ul.rows small {
+  display: block;
+  color: var(--muted);
+  font-size: 14px;
+}
+.auth-card .facts {
+  margin: 0 0 16px;
+  padding: 14px 16px;
+  border-radius: var(--r-l);
+  background: var(--soft);
+  font-size: 16px;
+}
+.auth-card .facts p {
+  margin: 0;
+}
+.auth-card .facts p + p {
+  margin-top: 6px;
+}
+
+/* numbered setup steps */
+.auth-card ol.steps {
+  list-style: none;
+  counter-reset: step;
+  margin: 18px 0 4px;
+  padding: 0;
+}
+.auth-card ol.steps > li {
+  counter-increment: step;
+  position: relative;
+  padding: 0 0 18px 46px;
+}
+.auth-card ol.steps > li::before {
+  content: counter(step);
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 700;
+  font-size: 15px;
+}
+.auth-card ol.steps > li::after {
+  content: '';
+  position: absolute;
+  left: 14.5px;
+  top: 36px;
+  bottom: 6px;
+  width: 1px;
+  background: var(--line);
+}
+.auth-card ol.steps > li:last-child::after {
+  display: none;
+}
+.auth-card ol.steps h2 {
+  padding-top: 3px;
+}
+.auth-card ol.steps label {
+  margin: 10px 0 0;
+}
+
+/* a value with a copy button (MCP URL, SQL) */
+.copy-row {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+  margin: 8px 0 4px;
+}
+.copy-row code,
+.auth-card .copy-row code {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-m);
+  background: var(--soft);
+  font:
+    15px ui-monospace,
+    'SF Mono',
+    Menlo,
+    monospace;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+.auth-card .copy-row button {
+  flex: none;
+  min-height: 44px;
+  padding: 0 16px;
+  font-size: 15px;
+  background: var(--surface);
+  border-color: var(--line);
+  color: var(--ink);
+}

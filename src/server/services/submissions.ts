@@ -327,10 +327,15 @@ export function submissionService(ctx: AppContext) {
       };
     },
 
-    /** Latest committed Snapshot only; never the live draft (§10.3, §16.3). */
-    async latest(problemId: string): Promise<Submission | NotReady> {
+    /**
+     * The latest committed Snapshot, or an earlier one by ID; never the live draft (§10.3, §16.3).
+     * `has_unsubmitted_changes` always compares the draft with the latest Snapshot.
+     */
+    async latest(problemId: string, snapshotId?: string): Promise<Submission | NotReady> {
       const row = await requireProblem(ctx, problemId);
       const question = { title: row.title, body: row.body, type: row.type };
+      if (!row.latest_snapshot_seq && snapshotId)
+        throw new DomainError('not_found', 'Snapshot not found for this problem');
       if (!row.latest_snapshot_seq)
         return {
           status: 'not_ready',
@@ -339,10 +344,17 @@ export function submissionService(ctx: AppContext) {
           has_unsubmitted_changes: !!row.has_content,
           question,
         };
-      const snapshot = (await ctx.db
-        .prepare('SELECT * FROM snapshots WHERE problem_id = ? AND sequence = ?')
-        .bind(problemId, row.latest_snapshot_seq)
-        .first<SnapshotRow>())!;
+      const [latest, requested] = await ctx.db.batch<SnapshotRow>([
+        ctx.db
+          .prepare('SELECT * FROM snapshots WHERE problem_id = ? AND sequence = ?')
+          .bind(problemId, row.latest_snapshot_seq),
+        ctx.db
+          .prepare('SELECT * FROM snapshots WHERE problem_id = ? AND id = ?')
+          .bind(problemId, snapshotId ?? ''),
+      ]);
+      const latestSnapshot = latest.results[0];
+      const snapshot = snapshotId ? requested.results[0] : latestSnapshot;
+      if (!snapshot) throw new DomainError('not_found', 'Snapshot not found for this problem');
       const object = await ctx.storage.get(snapshot.image_key);
       if (!object) throw new DomainError('upload_failed', 'The Snapshot image is unavailable');
       return {
@@ -350,9 +362,10 @@ export function submissionService(ctx: AppContext) {
         problem_id: problemId,
         snapshot_id: snapshot.id,
         sequence: snapshot.sequence,
+        latest_sequence: latestSnapshot.sequence,
         created_at: new Date(snapshot.created_at).toISOString(),
         answer_state: row.answer_state,
-        has_unsubmitted_changes: row.canvas_fingerprint !== snapshot.fingerprint,
+        has_unsubmitted_changes: row.canvas_fingerprint !== latestSnapshot.fingerprint,
         question,
         image: { mimeType: 'image/png', body: object.body, length: object.size },
       };
