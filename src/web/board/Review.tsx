@@ -76,7 +76,7 @@ export function FeedbackCard({ s, c, detail }: Props) {
       role="region"
       aria-label="Feedback"
       style={style}
-      data-state={card.state}
+      data-pop={card.state}
     >
       <div className="fbhead">
         {verdict ? (

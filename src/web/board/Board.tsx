@@ -189,7 +189,7 @@ function Chrome({
       )}
       {s.ui.overview && <div className="scrim clear" onClick={() => c.closeAll()} />}
       {sheet.mounted && (
-        <div className="sheet" role="dialog" aria-label="All problems" data-state={sheet.state}>
+        <div className="sheet" role="dialog" aria-label="All problems" data-pop={sheet.state}>
           <Overview s={s} c={c} current={current} />
         </div>
       )}

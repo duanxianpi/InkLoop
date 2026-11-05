@@ -85,7 +85,7 @@ export function Overview({
           <Chevron dir="x" />
         </button>
         {menu.mounted && (
-          <div className="collmenu" role="menu" data-state={menu.state}>
+          <div className="collmenu" role="menu" data-pop={menu.state}>
             {s.collections.map((entry) => (
               <button
                 key={entry.id}

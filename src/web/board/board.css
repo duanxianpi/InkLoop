@@ -1383,7 +1383,7 @@
   --pop-from: translateY(6px);
   transform-origin: bottom left;
 }
-.app [data-state='closed'] {
+.chrome [data-pop='closed'] {
   animation: pop-out 0.14s ease-in forwards;
   pointer-events: none;
 }
@@ -1404,7 +1404,7 @@
     animation: none !important;
     transition: none !important;
   }
-  .app [data-state='closed'] {
+  .chrome [data-pop='closed'] {
     visibility: hidden;
   }
 }

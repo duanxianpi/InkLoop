@@ -73,7 +73,7 @@ export function Rail({ s, c, locked }: Props) {
       </button>
       {settings.mounted && <Settings s={s} c={c} state={settings.state} />}
       {colors.mounted && (
-        <div className="cpop" role="menu" aria-label="Pen colour" data-state={colors.state}>
+        <div className="cpop" role="menu" aria-label="Pen colour" data-pop={colors.state}>
           {(Object.keys(INK) as InkColor[]).map((color) => (
             <button
               key={color}
@@ -106,7 +106,7 @@ function Settings({ s, c, state }: { s: BoardState; c: BoardController; state: s
     location.assign('/login');
   };
   return (
-    <div className="pop" id="settings" role="dialog" aria-label="Settings" data-state={state}>
+    <div className="pop" id="settings" role="dialog" aria-label="Settings" data-pop={state}>
       <div className="grp">
         <h3>Writing</h3>
         <Toggle

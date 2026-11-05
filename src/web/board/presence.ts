@@ -5,7 +5,8 @@ const EXIT_MS = 140;
 
 /**
  * Keeps a popup mounted while it animates out. Render it while `mounted`, with
- * `data-state={state}`: board.css animates it in on mount and out once the state is 'closed'.
+ * `data-pop={state}`: board.css animates it in on mount and out once the state is 'closed'. (Not
+ * data-state: tldraw wraps its canvas in a data-state="closed" element.)
  */
 export function usePresence(open: boolean) {
   const [leaving, setLeaving] = useState(false);
