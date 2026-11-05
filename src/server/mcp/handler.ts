@@ -8,8 +8,8 @@ import { callTool, IMAGE_DATA, isToolName, type ToolResult } from './tools';
 
 // Hand-rolled MCP endpoint: stateless Streamable HTTP, protocol version 2025-11-25.
 //
-// It implements only what four synchronous tools need, so a request runs a few small functions
-// instead of the SDK's transport, session and schema machinery (CPU figures: docs/performance.md).
+// It implements only what the stateless tools need, so a request runs a few small functions
+// instead of the SDK's transport, session and schema machinery (CPU figures: docs/experiments/performance.md).
 // Deliberately absent: SSE streams, sessions (Mcp-Session-Id), JSON-RPC batches, server-to-client
 // requests, and every capability other than tools. Unsupported methods get "method not found".
 // OAuth, bearer tokens and scopes are checked before this runs (src/server/auth/oauth.ts).

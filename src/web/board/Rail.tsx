@@ -4,6 +4,7 @@ import { forgetOfflineData } from '../pwa';
 import type { BoardController, BoardState } from './controller';
 import { EraserIcon, PenIcon, RedoIcon, SettingsIcon, UndoIcon } from './icons';
 import { usePresence } from './presence';
+import thirdPartyNoticesUrl from '../../../THIRD_PARTY_NOTICES.txt?url';
 
 type Props = { s: BoardState; c: BoardController; locked: boolean };
 
@@ -139,6 +140,9 @@ function Settings({ s, c, state }: { s: BoardState; c: BoardController; state: s
           </a>
           <a className="prow" href="/settings/password">
             Change password
+          </a>
+          <a className="prow" href={thirdPartyNoticesUrl} target="_blank" rel="noreferrer">
+            Licenses and notices
           </a>
           <button className="prow" onClick={() => void signOut()}>
             Sign out

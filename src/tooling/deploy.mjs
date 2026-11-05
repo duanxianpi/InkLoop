@@ -22,6 +22,29 @@ export function deploy(extra = [], execute = spawnSync) {
   show(built);
   if (built.status !== 0) return built.status ?? 1;
 
+  // Account-level R2 activation is separate from bucket auto-provisioning. Check before any
+  // migration or maintenance deployment, so a new account cannot fail halfway through setup.
+  const r2 = run(['r2', 'bucket', 'list']);
+  if (r2.status !== 0) {
+    show(r2);
+    const output = `${r2.stdout ?? ''}\n${r2.stderr ?? ''}`;
+    if (/\b10042\b|please enable R2|R2.*not enabled/i.test(output)) {
+      console.error(
+        'R2 is not enabled for the target Cloudflare account. Before deploying InkLoop, open ' +
+          'Cloudflare Dashboard > Storage & databases > R2 > Overview and complete the R2 ' +
+          'subscription checkout. Then retry this deployment. InkLoop can create a bucket ' +
+          'after activation, but cannot activate the account subscription for you.\n' +
+          'Instructions: https://developers.cloudflare.com/r2/get-started/#before-you-begin',
+      );
+    } else {
+      console.error(
+        'R2 availability check failed. Check the Cloudflare account, deployment credentials, ' +
+          'R2 permissions and connectivity, then retry. No migrations or deployments were attempted.',
+      );
+    }
+    return r2.status ?? 1;
+  }
+
   let migration = run(['d1', 'migrations', 'apply', 'DB', '--remote']);
   if (migration.status !== 0) {
     const output = `${migration.stdout ?? ''}\n${migration.stderr ?? ''}`;
@@ -52,22 +75,31 @@ export function deploy(extra = [], execute = spawnSync) {
 }
 
 /**
- * The Cloudflare dashboard's D1 Studio page for this Worker's database, shown on the setup page
- * so the owner can find the claim key. Best effort: any lookup failure only omits the link.
- * Auto-provisioned databases are named `<worker>-db`.
+ * Open the database overview first, then let the owner choose Explore Data. Direct Studio links
+ * can fail on the dashboard's initial load. Fall back to the account D1 list if DB lookup fails;
+ * an ambiguous account leaves the UI's generic D1 link in place.
  */
 export function d1ConsoleUrl(run) {
   try {
+    const who = run(['whoami', '--json']);
+    if (who.status !== 0) return null;
+    const accounts = JSON.parse(who.stdout).accounts ?? [];
+    if (accounts.length !== 1 || !accounts[0].id) return null;
+    const base = `https://dash.cloudflare.com/${accounts[0].id}/workers/d1`;
     const name = /"name"\s*:\s*"([^"]+)"/.exec(
       readFileSync(resolve(root, 'wrangler.jsonc'), 'utf8'),
     )?.[1];
-    const who = run(['whoami', '--json']);
     const list = run(['d1', 'list', '--json']);
-    if (!name || who.status !== 0 || list.status !== 0) return null;
-    const accounts = JSON.parse(who.stdout).accounts ?? [];
-    const database = JSON.parse(list.stdout).find((entry) => entry.name === `${name}-db`);
-    if (accounts.length !== 1 || !database?.uuid) return null;
-    return `https://dash.cloudflare.com/${accounts[0].id}/workers/d1/databases/${database.uuid}/studio`;
+    if (!name || list.status !== 0) return base;
+    try {
+      const databases = JSON.parse(list.stdout);
+      const database = Array.isArray(databases)
+        ? databases.find((entry) => entry.name === `${name}-db`)
+        : null;
+      return database?.uuid ? `${base}/databases/${database.uuid}/metrics` : base;
+    } catch {
+      return base;
+    }
   } catch {
     return null;
   }

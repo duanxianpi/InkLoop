@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { build } from 'esbuild';
 import { build as buildWeb } from 'vite';
 import { generateToolList } from './mcp-tools.mjs';
+import { publishNotices } from './licenses.mjs';
 
 const root = new URL('../../', import.meta.url);
 const path = (relative) => fileURLToPath(new URL(relative, root));
@@ -25,6 +26,9 @@ for (const name of ['fonts', 'icons', 'translations', 'embed-icons', 'LICENSE.md
     recursive: true,
   });
 }
+
+// Complete license texts ship with the browser application, including locally copied fonts.
+await publishNotices();
 
 // The service worker is served from the site root. It lists this build's files, so its own bytes
 // (and with them its version) change whenever the shell or anything it loads changes.

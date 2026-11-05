@@ -15,7 +15,7 @@ export type AuthPageData =
       purpose: PasswordPurpose;
       initialized: boolean;
       origin: string;
-      /** Before setup only: the deployment's D1 Studio page, when the deployment knows it. */
+      /** Setup/recovery: D1 database overview or account list; never contains a key. */
       d1ConsoleUrl?: string;
     }
   | ({ kind: 'consent' } & ConsentData)

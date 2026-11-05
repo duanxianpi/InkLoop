@@ -69,9 +69,9 @@ for (const page of PAGES) {
 // Public setup state and password sign-in. Setup and recovery prove the D1 claim/recovery key.
 app.get('/api/status', (c) => {
   const initialized = !!c.get('authState').initialized_at;
-  // Before setup only: the exact D1 Studio page holding the claim key (it names the account).
-  const studio = !initialized && c.env.D1_CONSOLE_URL ? { d1ConsoleUrl: c.env.D1_CONSOLE_URL } : {};
-  return c.json({ initialized, ...studio });
+  // Dashboard navigation metadata for setup and recovery; Cloudflare still authorizes DB access.
+  const consoleLink = c.env.D1_CONSOLE_URL ? { d1ConsoleUrl: c.env.D1_CONSOLE_URL } : {};
+  return c.json({ initialized, ...consoleLink });
 });
 // Browsers and some MCP clients look for an icon at the root.
 app.get('/favicon.ico', (c) =>

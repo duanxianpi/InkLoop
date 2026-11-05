@@ -1,5 +1,9 @@
 # Cloudflare CPU measurements — 2026-11-03
 
+> Historical evidence from the 2026-11-03 foundation: Passkey authentication, four MCP tools and stub product services. These descriptions and test counts apply to that measured version, not the current product. Start with the [experiment index](README.md) and [production measurements](performance-production-2026-11-04.md).
+
+For the current deployed product with real persistence, see the [2026-11-04 production measurements](performance-production-2026-11-04.md). The historical foundation/stub results below have a different scope.
+
 The current foundation **does not have a demonstrated 10 ms CPU budget for every supported request**. Ordinary page/session requests are inexpensive, but MCP discovery has outliers and larger valid MCP bodies exceed 10 ms before product persistence is implemented.
 
 ## Audit closure and development decision

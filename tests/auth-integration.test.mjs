@@ -11,6 +11,7 @@ const { Miniflare, convertV4MiniflareOptions } = require(
 );
 
 test('Hono SPA routing, direct static assets, owner sessions and OAuth lifecycle', async () => {
+  const d1ConsoleUrl = 'https://dash.cloudflare.com/account/workers/d1/databases/database/metrics';
   const html = await readFile(new URL('../dist/public/index.html', import.meta.url));
   const assetPath = html.toString().match(/src="([^"]+\.js)"/)[1];
   const javascript = await readFile(new URL('../dist/public' + assetPath, import.meta.url));
@@ -32,6 +33,7 @@ test('Hono SPA routing, direct static assets, owner sessions and OAuth lifecycle
       compatibilityFlags: ['nodejs_compat', 'global_fetch_strictly_public'],
       d1Databases: ['DB'],
       kvNamespaces: ['OAUTH_KV'],
+      bindings: { D1_CONSOLE_URL: d1ConsoleUrl },
       r2Buckets: ['STORAGE'],
       durableObjects: { CHANGE_HUB: { className: 'ChangeHub', useSQLite: true } },
       assets: {
@@ -77,6 +79,7 @@ test('Hono SPA routing, direct static assets, owner sessions and OAuth lifecycle
     assert.match(setupHtml, /src="\/assets\//);
     assert.deepEqual(await (await mf.dispatchFetch(origin + '/api/status')).json(), {
       initialized: false,
+      d1ConsoleUrl,
     });
     const bootstrap = await db
       .prepare("SELECT secret_display FROM admin_keys WHERE purpose='bootstrap'")
@@ -167,7 +170,11 @@ test('Hono SPA routing, direct static assets, owner sessions and OAuth lifecycle
     assert.equal((await request('/assets/missing.js')).status, 404);
     assert.equal((await request('/api/unknown')).status, 401);
     assert.equal((await request('/api/unknown', { headers: auth })).status, 404);
-    assert.deepEqual(await (await request('/api/status')).json(), { initialized: true });
+    // The same navigation link stays available after setup for public password recovery.
+    assert.deepEqual(await (await request('/api/status')).json(), {
+      initialized: true,
+      d1ConsoleUrl,
+    });
     const mutation = { ...auth, Origin: origin, 'Content-Type': 'application/json' };
     for (const path of ['/auth/consent', '/api/grants/revoke']) {
       const invalid = await request(path, { method: 'POST', headers: mutation, body: 'null' });

@@ -1,5 +1,7 @@
 # MCP subset review and Cloudflare remeasurement
 
+> Historical evidence from the 2026-11-03 foundation: Passkey authentication, four MCP tools and stub product services. These descriptions and test counts apply to that measured version, not the current product. Start with the [experiment index](README.md) and [production measurements](performance-production-2026-11-04.md).
+
 Reviewed the current working-tree implementation on 2026-11-03. The subset keeps OAuth in the existing SDK and implements only stateless JSON responses for initialization, ping and the four tools. No product source was changed by this review.
 
 ## Review findings

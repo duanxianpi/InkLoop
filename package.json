@@ -10,7 +10,9 @@
     "test": "node --test --test-concurrency=1 tests/*.test.mjs",
     "deploy": "node src/tooling/deploy.mjs",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "licenses": "node src/tooling/licenses.mjs",
+    "licenses:check": "node src/tooling/licenses.mjs --check"
   },
   "dependencies": {
     "@cloudflare/workers-oauth-provider": "1.2.4",
@@ -39,5 +41,6 @@
   },
   "engines": {
     "node": ">=22.12.0"
-  }
+  },
+  "license": "MIT"
 }

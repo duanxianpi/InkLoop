@@ -1,5 +1,7 @@
 # Authentication optimization follow-up
 
+> Historical evidence from the 2026-11-03 foundation: Passkey authentication, four MCP tools and stub product services. These descriptions and test counts apply to that measured version, not the current product. Start with the [experiment index](README.md) and [production measurements](performance-production-2026-11-04.md).
+
 Measured on Cloudflare on 2026-11-03, version `fd6aab33-63b9-4af0-9ac2-53d22ed37f6b`. Source hashes and sanitized per-request evidence are retained internally. This deployment uses the current working tree, including pre-existing user edits; it is not a controlled before/after experiment.
 
 ## Changes

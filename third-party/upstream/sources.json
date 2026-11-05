@@ -1,0 +1,32 @@
+[
+  {
+    "file": "tldraw-3.15.6-LICENSE.md",
+    "url": "https://raw.githubusercontent.com/tldraw/tldraw/v3.15.6/LICENSE.md",
+    "sha256": "a051565874fd424cc9c19049d425ead719b9b7cf214546f31a368b4a3822755d"
+  },
+  {
+    "file": "tldraw-3.15.6-TRADEMARKS.md",
+    "url": "https://raw.githubusercontent.com/tldraw/tldraw/v3.15.6/TRADEMARKS.md",
+    "sha256": "aa4f4188dec01eb40c0f6a91cfa2a64dc79d7020baadec789ae50d547b4bc12a"
+  },
+  {
+    "file": "tiptap-2.27.3-LICENSE.md",
+    "url": "https://raw.githubusercontent.com/ueberdosis/tiptap/0ed4a30a6cda23799a01881f67d01ad218a2ac6d/LICENSE.md",
+    "sha256": "c96e5ecb55ac593157ad1d21d1f44a611187f494a0f04c235a1ae692c88d6ba9"
+  },
+  {
+    "file": "IBM-Plex-OFL.txt",
+    "url": "https://raw.githubusercontent.com/IBM/plex/master/LICENSE.txt",
+    "sha256": "7e6b2818edbd8f6a01ae80641cc8f16a51080d08fb4e532be3a0b6f74adb07da"
+  },
+  {
+    "file": "Shantell-Sans-OFL.txt",
+    "url": "https://raw.githubusercontent.com/arrowtype/shantell-sans/main/OFL.txt",
+    "sha256": "ebfce7d104d597c385b71e9fbf8f0e2034e73320f857086105dc265b82c05caa"
+  },
+  {
+    "file": "react-remove-scroll-bar-LICENSE",
+    "url": "https://raw.githubusercontent.com/theKashey/react-remove-scroll-bar/8ca9ba5ea52de03308fe8ced94f7b159a44d28ff/LICENSE",
+    "sha256": "a79aae0c0f21990d9d963bb3c5a79cdcea9a46f8523ba55c58d7fe776b6ebc84"
+  }
+]

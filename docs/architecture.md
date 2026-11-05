@@ -1,6 +1,6 @@
 # InkLoop — Final Architecture
 
-Architecture baseline: 2026-11-03 (audit corrections applied). “Final” identifies the selected structure and contracts for the next implementation stage; it does not mean the product is complete.
+Architecture and implementation status reviewed against source on 2026-11-04. “Final” identifies the selected structure and contracts; release acceptance remains incomplete.
 
 ## 1. Product and scope
 
@@ -14,21 +14,22 @@ There is no built-in LLM, model API key, chat system, automatic grader, backgrou
 
 ## 2. Current implementation status
 
-| Area                                                            | Status in this repository                                                        |
-| --------------------------------------------------------------- | -------------------------------------------------------------------------------- |
-| Owner password sign-in, setup/recovery keys, Web sessions       | Implemented; Passkeys were replaced by passwords in `0005_password.sql`          |
-| OAuth consent, scopes, epoch checks, grant listing/revocation   | Implemented; exercised in local integration tests                                |
-| React account pages                                             | Implemented in the same client-rendered React SPA as the product entry           |
-| Worker routing, assets, build/deploy scripts, auth migrations   | Implemented                                                                      |
-| Browser API and four MCP tool definitions                       | Wired to shared service contracts; input validation and body budgets implemented |
-| Product DTOs, domain errors, operational limits, Web API client | Implemented                                                                      |
-| Product database schema and services                            | Implemented (`0004_product.sql`, `src/server/services/`); D1 integration tests   |
-| Product React UI and canvas adapter                             | Implemented; POC board ported to React components over a thin tldraw adapter     |
-| ChangeHub, change counter and long-poll services                | Implemented; WebSocket, catch-up and long-poll covered by local tests            |
-| Local drafts, serial save queue, conflict recovery              | Implemented (IndexedDB, `src/web/sync/`)                                         |
-| Export/restore, object collection, complete product acceptance  | Pending                                                                          |
+| Area                                                            | Status in this repository                                                            |
+| --------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| Owner password sign-in, setup/recovery keys, Web sessions       | Implemented; Passkeys were replaced by passwords in `0005_password.sql`              |
+| OAuth consent, scopes, epoch checks, grant listing/revocation   | Implemented; exercised in local integration tests                                    |
+| React account pages                                             | Implemented in the same client-rendered React SPA as the product entry               |
+| Worker routing, assets, build/deploy scripts, auth migrations   | Implemented                                                                          |
+| Browser API and 13 MCP tool definitions                         | Implemented over shared product services; input validation and body budgets enforced |
+| Product DTOs, domain errors, operational limits, Web API client | Implemented                                                                          |
+| Product database schema and services                            | Implemented (`0004_product.sql`, `src/server/services/`); D1 integration tests       |
+| Product React UI and canvas adapter                             | Implemented; POC board ported to React components over a thin tldraw adapter         |
+| ChangeHub, change counter and long-poll services                | Implemented; WebSocket, catch-up and long-poll covered by local tests                |
+| Local drafts, serial save queue, conflict recovery              | Implemented (IndexedDB, `src/web/sync/`)                                             |
+| Installable PWA and offline board reads                         | Implemented (`src/sw/sw.ts`, `src/web/pwa.ts`); local service-worker tests           |
+| Export/restore, object collection, complete product acceptance  | Pending                                                                              |
 
-Local tests run the real Worker, D1, R2 and ChangeHub in Miniflare, including concurrent commits, idempotent retries and stale-epoch rollback. The isolated Cloudflare authentication/CPU run is documented in [Runtime measurements](performance.md). Physical-device Passkey testing and production deployment/upgrade acceptance remain release checks.
+Local tests run the real Worker, D1, R2 and ChangeHub in Miniflare, including concurrent commits, idempotent retries and stale-epoch rollback. The [production CPU run](experiments/performance-production-2026-11-04.md) exercised real OAuth-authorized MCP reads, creation, updates and deletion with D1 persistence. Repeated reauthorization occurred during that run and remains unresolved. Physical-device handwriting, the complete deployed image-review loop and first-install/upgrade acceptance remain release checks.
 
 ## 3. Runtime topology
 
@@ -67,7 +68,7 @@ D1 is authoritative for structured state and committed pointers. R2 holds object
 | `src/shared/pages.ts`         | Page registry shared by Hono and React                                                |
 | `src/server/routes/`          | Static SPA shell handler and mounted product API router                               |
 | `src/server/mcp/`             | Stateless MCP endpoint, tool definitions, input validators, scope checks and dispatch |
-| `src/server/services/`        | Shared product service interfaces; future business invariants                         |
+| `src/server/services/`        | Product services, business invariants and guarded D1/R2 operations                    |
 | `src/server/env.ts`, `hub.ts` | Bindings/request context and notification-only Durable Object interface               |
 | `src/web/main.tsx`, `App.tsx` | Single browser entry and page selection                                               |
 | `src/web/auth/`               | Browser-only React account pages and CSS                                              |
@@ -93,9 +94,15 @@ The sign-in pages stretch the password in the browser (PBKDF2-SHA256) and send o
 
 OAuth integration receives an authenticated MCP handler from the root router. It imports no product services or MCP tool implementation. The request's auth-state snapshot is reused for token/grant validation and metadata; revocation still requires its own authoritative D1 lookup. There is no cross-request authorization cache. Consent submission receives the session already checked by middleware, and `mcp:read` is mandatory in both UI and server validation. `/setup` is rate limited and skips bootstrap initialization writes once setup is complete.
 
-HTML and default API responses use `no-store`. Fingerprinted static assets use `public, max-age=31536000, immutable` through `_headers`. Explicit route cache policies survive middleware, including private immutable Snapshot images: once implemented, such images may remain in the owner's browser cache after session revocation. Their URLs must identify immutable content. Unknown asset paths and direct `/index.html` requests return 404.
+HTML and default API responses use `no-store`. Fingerprinted static assets use `public, max-age=31536000, immutable` through `_headers`. Explicit route cache policies survive middleware, including private immutable Snapshot images: such images may remain in the owner's browser cache after session revocation. Their URLs must identify immutable content. Unknown asset paths and direct `/index.html` requests return 404.
 
 Auth source is a maintained InkLoop adaptation of the upstream template. Updates are reviewed merges, not source synchronization. See [Authentication](auth-integration.md) for the route table and lifecycle.
+
+### Installed app and offline storage
+
+The browser registers `/sw.js`; Cloudflare Static Assets serves it and `/manifest.webmanifest` with `no-cache` revalidation. The service worker precaches the board's required assets and matching shell before installation completes. It does not force activation over open pages; older assets are pruned when the new version activates.
+
+Board navigation uses the network and falls back to the cached shell only when the network is unreachable. Selected board GETs (collections, preferences, problem lists/details and Snapshot images) keep their latest successful responses for offline fallback. Canvas recovery uses acknowledged documents and revisions in IndexedDB rather than service-worker response caching. Writes, account pages, OAuth, MCP and live updates require the network. Offline copies are device-local data, not fresh server authorization or a backup. Signing out clears cached board responses and acknowledged Canvas copies; unsent recovery drafts are managed separately. A 401 clears cached board responses.
 
 ## 6. Data ownership
 
@@ -193,22 +200,22 @@ Feedback is append-only and tied to the supplied Snapshot. Multiple entries for 
 
 ### Snapshot image representation
 
-Each Snapshot image is stored once, in private R2, as the base64 text of its PNG. D1 holds the object key, text length, PNG dimensions and Snapshot metadata, never the image itself. The image bytes never pass through Worker JavaScript on either the write or the read path.
+Each Snapshot image is stored once, in private R2, as the base64 text of its PNG. D1 holds the object key, text length, PNG dimensions and Snapshot metadata, never the image itself. The Worker streams the base64 representation rather than decoding the whole PNG. Upload validation inspects every encoded byte in JavaScript and decodes the short PNG header; reads stream the stored text.
 
 Why base64 in R2:
 
-- MCP carries images as base64 inside JSON. Stored already encoded, the object can be streamed straight into the `get_submission` response. Encoding in the Worker would cost CPU proportional to image size, against the 10 ms Workers Free budget ([Runtime measurements](performance.md)).
-- D1 is unsuitable. A row, string or BLOB is limited to 2 MB, below the 8 MiB Snapshot limit, and a BLOB crosses the D1 binding as a JavaScript array with one number per byte, serialized through JSON. Per-call binding overhead is already the largest warm CPU cost; image-sized results would dominate it.
+- MCP carries images as base64 inside JSON. Stored already encoded, the object can be streamed straight into the `get_submission` response. Encoding in the Worker would cost CPU proportional to image size, against the 10 ms Workers Free budget ([Runtime measurements](experiments/performance.md)).
+- D1 is unsuitable. A row, string or BLOB is limited to 2 MB, below the 8 MiB Snapshot limit, and a BLOB crosses the D1 binding as a JavaScript array with one number per byte, serialized through JSON. Returning image-sized JavaScript arrays would add serialization and allocation work; this run did not profile its CPU cost.
 - One stored representation avoids keeping a PNG and a base64 copy consistent. The cost is 4/3 storage and upload size.
 
-Write path: the browser encodes the exported PNG (browser CPU costs nothing against the Worker budget) and uploads the text with a `Content-Length`. The Worker checks the length against the limit, decodes only the first 32 characters (24 bytes: PNG signature and IHDR width/height) to validate the header and dimensions, and pipes the remaining stream into R2 through a fixed-length stream. While streaming it checks that every byte is base64 (alphabet, then at most two trailing `=`; the total length is a multiple of 4), because `get_submission` places the stored text verbatim inside a JSON string. An invalid byte aborts the upload, so no object is stored and nothing is committed. It does not decode or hash the image: the check is one table lookup per byte, a small CPU cost next to decoding. The commit then follows §7 unchanged.
+Write path: the browser encodes the exported PNG (browser CPU costs nothing against the Worker budget) and uploads the text with a `Content-Length`. The Worker checks the length against the limit, decodes only the first 32 characters (24 bytes: PNG signature and IHDR width/height) to validate the header and dimensions, and pipes the remaining stream into R2 through a fixed-length stream. While streaming it checks that every byte is base64 (alphabet, then at most two trailing `=`; the total length is a multiple of 4), because `get_submission` places the stored text verbatim inside a JSON string. An invalid byte aborts the upload, so no object is stored and nothing is committed. It does not decode or hash the image: validation is proportional to encoded image size; its deployed CPU cost remains unmeasured. The commit then follows §7 unchanged.
 
 Read paths:
 
 - `get_submission` serializes its JSON-RPC result with a placeholder for the image `data`, splits the string at the placeholder, and responds with prefix + R2 object stream + suffix and an exact `Content-Length`. Base64 contains no characters that need JSON escaping.
 - `GET /api/snapshots/:id/image` returns the stored text unchanged; the browser decodes it for display.
 
-Use one shared pure derivation module when implementing these states, so Overview, Review and MCP summaries agree.
+The shared pure derivation module (`src/shared/derive.ts`) keeps Overview, Review and MCP summaries consistent.
 
 ## 9. Live updates
 
@@ -216,7 +223,7 @@ The selected transport is a notification-only WebSocket to one ChangeHub per dep
 
 The payload is only `{ type: "changed", seq }`. Pages retrieve actual data through authenticated routes. D1 assigns the counter with committed product mutations; hub delivery may repeat, arrive out of order or fail. Clients reconcile using the authoritative counter rather than counting notifications.
 
-The future browser connection flow must establish its subscription and then read the current counter, reconcile after reconnect, and periodically recheck even while connected so a missed post-commit notification cannot leave an indefinitely stale UI. Remote updates never switch the active problem, change the camera or interrupt a pen stroke.
+The browser change feed (`src/web/sync/changeFeed.ts`) establishes its subscription before reading the current counter, reconciles after reconnect, rechecks every 60 seconds while connected and long-polls while the socket is unavailable. This catches missed post-commit notifications. Remote updates never switch the active problem, change the camera or interrupt a pen stroke.
 
 The hub must enforce auth-epoch changes and define bounded socket lifetime/revalidation; an initial handshake does not authorize an indefinite connection. No private content is sent over it. The hub tags each socket with its auth epoch and a one-hour lifetime: a notification from a newer epoch, or an alarm at expiry, closes it and the page reconnects through the authenticated route.
 
@@ -224,13 +231,13 @@ The hub must enforce auth-epoch changes and define bounded socket lifetime/reval
 
 Inputs and results are centralized in `src/shared/schemas.ts` and `model.ts`. Create destinations have enforced exclusive choices at both Set and Collection levels. The browser list client forwards filters and cursors rather than silently fetching only the first 100 records.
 
-MCP has an 8 MiB body budget; canvas JSON, PNG and preferences have 4 MiB, 8 MiB and 16 KiB budgets respectively. Shared HTTP body readers count streamed bytes before full buffering and reject invalid UTF-8. Canvas documents and Snapshot images are budgeted by `Content-Length` and streamed to R2 without parsing, so their size does not drive Worker CPU. HTTP and MCP application errors share stable codes plus human-readable messages; OAuth protocol errors retain SDK codes and `error_description`. Auth/OAuth requests retain their separate 64 KiB limit. Field-level limits apply in addition to body budgets. See [API contracts](api.md). Actual Cloudflare measurements show that larger valid MCP bodies exceed 10 ms even with stub services; current limits are transport budgets, not a guarantee of Free-plan CPU capacity. See [Runtime measurements](performance.md).
+MCP has an 8 MiB body budget; canvas JSON, PNG and preferences have 4 MiB, 8 MiB and 16 KiB budgets respectively. Shared HTTP body readers count streamed bytes before full buffering and reject invalid UTF-8. Canvas documents and Snapshot images are budgeted by `Content-Length` and streamed to R2 without full JSON/PNG parsing. Snapshot uploads still inspect each base64 byte, so streaming does not establish size-independent CPU cost. HTTP and MCP application errors share stable codes plus human-readable messages; OAuth protocol errors retain SDK codes and `error_description`. Auth/OAuth requests retain their separate 64 KiB limit. Field-level limits apply in addition to body budgets. See [API contracts](api.md). The [production measurements](experiments/performance-production-2026-11-04.md) recorded 12 of 36 business requests above 10 ms, including persisted creates and listing. Current limits are transport budgets, not a guarantee of Free-plan CPU capacity.
 
 ## 11. Build, formatting, deployment and documentation
 
-Vite emits the shared SPA HTML and ordinary hashed JS/CSS assets. The build also copies the pinned tldraw fonts, icons and translations to versioned local asset URLs, verified against the engine version. The canvas passes `canvasAssetUrls` to tldraw. Fonts, MathJax and all other assets are served from `/assets`; Vite never inlines assets as `data:` URLs. The page CSP keeps `script-src 'self'` and allows inline styles (`style-src 'self' 'unsafe-inline'`), because tldraw's license watermark and image export and MathJax's SVG output inject `<style>` elements. Account styles are scoped to `.auth-page`. A separate Worker bundle is generated for integration tests. Node.js 22.12+ is required. Deployment always rebuilds successfully before any migration, provisioning or publishing, and uses the same source and ordered migrations, provisioning missing resources through a maintenance-only Worker before publishing the application.
+Vite emits the shared SPA HTML and ordinary hashed JS/CSS assets. The build also copies the pinned tldraw fonts, icons and translations to versioned local asset URLs, verified against the engine version. The canvas passes `canvasAssetUrls` to tldraw. Fonts, MathJax and all other assets are served from `/assets`; Vite never inlines assets as `data:` URLs. The page CSP keeps `script-src 'self'` and allows inline styles (`style-src 'self' 'unsafe-inline'`), because tldraw's license watermark and image export and MathJax's SVG output inject `<style>` elements. Account styles are scoped to `.auth-page`. A separate Worker bundle is generated for integration tests. Node.js 22.12+ is required. Deployment always rebuilds successfully and verifies R2 availability with a read-only bucket-list request before any migration, provisioning or publishing, and uses the same source and ordered migrations, provisioning missing resources through a maintenance-only Worker before publishing the application.
 
-`docs/` is public and tracked. `internal/docs/` contains local planning and historical evidence and is ignored, along with experiments, prototypes and private deployment data. Public instructions must work without any ignored file or neighboring template checkout. Old Access/cf setup guides and the template source-copy workflow are retired.
+`docs/` is public and tracked. `docs/experiments/` contains public, sanitized experiment reports and performance evidence, with historical scope labels. `internal/docs/` contains private planning and evidence and is ignored, along with root-level experiments, prototypes and private deployment data. Public instructions must work without any ignored file or neighboring template checkout. Old Access/cf setup guides and the template source-copy workflow are retired.
 
 Prettier formats maintained source, tests, configuration and public Markdown. `npm run format` writes formatting; `npm run format:check` verifies it. Generated assets, local experiments, internal records and immutable migrations are excluded.
 
@@ -241,4 +248,4 @@ See [Deployment](deployment.md) and [Development](development.md) for commands a
 1. Physical iPad acceptance (§21 of the specification): Pencil latency, palm rejection, gestures, toolbar placement, touch-target size at the POC's 75% chrome scale, and the time PBKDF2 takes at sign-in.
 2. A deployed run with a real AI client: OAuth onboarding, create → write → Mark ready → `get_submission` → `append_feedback`.
 3. Data export/restore and collection of unreferenced R2 objects (failed uploads whose outcome was unknown) with a retention window.
-4. Cloudflare CPU measurements for the product services, which the earlier runs measured only as stubs ([Runtime measurements](performance.md)).
+4. Resolve repeated MCP reauthorization seen during the [production CPU run](experiments/performance-production-2026-11-04.md), then extend CPU measurements to Canvas/Snapshot/R2 and feedback paths, idle behavior and broader workloads. Basic MCP/D1 operations have been measured; a strict 10 ms budget is not established.

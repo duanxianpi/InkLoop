@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { access } from 'node:fs/promises';
 import { Hono } from 'hono';
 import { loadSource } from './load-source.mjs';
-import { deploy } from '../src/tooling/deploy.mjs';
+import { deploy, d1ConsoleUrl } from '../src/tooling/deploy.mjs';
 
 const { securityHeaders, authRateLimit } = await loadSource('src/server/middleware.ts');
 const { boundedText, boundedJson } = await loadSource('src/server/http/body.ts');
@@ -86,7 +86,7 @@ function runner(results) {
   };
 }
 
-test('deployment builds before migrations and stops entirely on build failure', () => {
+test('deployment builds and checks R2 before migrations and stops entirely on build failure', () => {
   const failed = runner([{ status: 2 }]);
   assert.equal(deploy([], failed.execute), 2);
   assert.equal(failed.calls.length, 1);
@@ -94,37 +94,103 @@ test('deployment builds before migrations and stops entirely on build failure', 
   const success = runner([
     { status: 0 },
     { status: 0 },
+    { status: 0 },
     { status: 0, stdout: JSON.stringify({ accounts: [{ id: 'acct' }] }) },
     { status: 0, stdout: JSON.stringify([{ name: 'inkloop-db', uuid: 'db-uuid' }]) },
   ]);
   assert.equal(deploy([], success.execute), 0);
-  assert.equal(success.calls.length, 5);
+  assert.equal(success.calls.length, 6);
   assert.match(success.calls[0].args[0], /\/build\.mjs$/);
-  assert.deepEqual(success.calls[1].args, ['d1', 'migrations', 'apply', 'DB', '--remote']);
-  assert.deepEqual(success.calls[4].args, [
+  assert.deepEqual(success.calls[1].args, ['r2', 'bucket', 'list']);
+  assert.deepEqual(success.calls[2].args, ['d1', 'migrations', 'apply', 'DB', '--remote']);
+  assert.deepEqual(success.calls[5].args, [
     'deploy',
     '--experimental-auto-create',
     '--var',
-    'D1_CONSOLE_URL:https://dash.cloudflare.com/acct/workers/d1/databases/db-uuid/studio',
+    'D1_CONSOLE_URL:https://dash.cloudflare.com/acct/workers/d1/databases/db-uuid/metrics',
   ]);
   // A failed lookup never blocks the deployment; the link is just omitted.
-  const lookupFails = runner([{ status: 0 }, { status: 0 }, { status: 1 }, { status: 1 }]);
+  const lookupFails = runner([{ status: 0 }, { status: 0 }, { status: 0 }, { status: 1 }]);
   assert.equal(deploy([], lookupFails.execute), 0);
   assert.deepEqual(lookupFails.calls.at(-1).args, ['deploy', '--experimental-auto-create']);
 });
 
+test('setup and recovery open the DB overview, with a D1-list fallback for unavailable metadata', () => {
+  const who = { status: 0, stdout: JSON.stringify({ accounts: [{ id: 'acct' }] }) };
+  const single = runner([
+    who,
+    { status: 0, stdout: JSON.stringify([{ name: 'inkloop-db', uuid: 'db-uuid' }]) },
+  ]);
+  assert.equal(
+    d1ConsoleUrl((args) => single.execute('wrangler', args)),
+    'https://dash.cloudflare.com/acct/workers/d1/databases/db-uuid/metrics',
+  );
+  assert.deepEqual(
+    single.calls.map(({ args }) => args),
+    [
+      ['whoami', '--json'],
+      ['d1', 'list', '--json'],
+    ],
+  );
+  for (const missing of [
+    { status: 1 },
+    { status: 0, stdout: 'not JSON' },
+    { status: 0, stdout: '[]' },
+    { status: 0, stdout: '{}' },
+  ]) {
+    const fallback = runner([who, missing]);
+    assert.equal(
+      d1ConsoleUrl((args) => fallback.execute('wrangler', args)),
+      'https://dash.cloudflare.com/acct/workers/d1',
+    );
+  }
+  for (const result of [
+    { status: 1 },
+    { status: 0, stdout: 'invalid JSON' },
+    { status: 0, stdout: JSON.stringify({ accounts: [] }) },
+    { status: 0, stdout: JSON.stringify({ accounts: [{ id: 'a' }, { id: 'b' }] }) },
+  ])
+    assert.equal(
+      d1ConsoleUrl(() => result),
+      null,
+    );
+});
+
 test('deployment fails closed on migration errors, including after initial provisioning', () => {
-  const failed = runner([{ status: 0 }, { status: 1 }]);
+  const failed = runner([{ status: 0 }, { status: 0 }, { status: 1 }]);
   assert.equal(deploy([], failed.execute), 1);
-  assert.equal(failed.calls.length, 2);
+  assert.equal(failed.calls.length, 3);
   const initial = runner([
+    { status: 0 },
     { status: 0 },
     { status: 1, stderr: "Couldn't find a D1 DB" },
     { status: 0 },
     { status: 3 },
   ]);
   assert.equal(deploy([], initial.execute), 3);
-  assert.equal(initial.calls.length, 4);
-  assert.match(initial.calls[2].args[1], /\/maintenance\.ts$/);
-  assert.deepEqual(initial.calls[3].args, ['d1', 'migrations', 'apply', 'DB', '--remote']);
+  assert.equal(initial.calls.length, 5);
+  assert.match(initial.calls[3].args[1], /\/maintenance\.ts$/);
+  assert.deepEqual(initial.calls[4].args, ['d1', 'migrations', 'apply', 'DB', '--remote']);
+});
+
+test('R2 check failures stop before cloud mutations and distinguish activation from other errors', (t) => {
+  const messages = [];
+  t.mock.method(console, 'error', (message) => messages.push(message));
+  for (const failure of [
+    { status: 1, stderr: 'Please enable R2 through the Cloudflare Dashboard. [code: 10042]' },
+    { status: 1, stderr: 'Please enable R2 Subscription for your account.' },
+    { status: 1, stderr: 'Authentication error [code: 10000]' },
+    { status: 7, stderr: 'Connection failed' },
+    { status: null, error: new Error('Unable to start Wrangler') },
+  ]) {
+    messages.length = 0;
+    const attempt = runner([{ status: 0 }, failure]);
+    assert.equal(deploy(['--config', 'wrangler.jsonc'], attempt.execute), failure.status ?? 1);
+    assert.equal(attempt.calls.length, 2);
+    assert.deepEqual(attempt.calls[1].args, ['r2', 'bucket', 'list', '--config', 'wrangler.jsonc']);
+    assert.match(
+      messages.join('\n'),
+      /10042|Please enable/.test(failure.stderr ?? '') ? /subscription checkout/ : /credentials/,
+    );
+  }
 });

@@ -10,7 +10,7 @@ Write on your tablet. Let ChatGPT, Claude, or another MCP-compatible AI assistan
 
 [Demo](#see-it-in-action) · [Get Started](#get-started) · [Make It Yours](#make-it-yours)
 
-> **Status:** the first complete product slice is implemented and tested locally, but InkLoop is not released yet. Physical-iPad testing, a deployed end-to-end run with a real AI client, and data export/restore remain. See [remaining release work](docs/architecture.md#12-remaining-release-work).
+> **Status:** the first complete product slice is implemented and tested locally, but InkLoop is not released yet. Deployed OAuth-authorized MCP/D1 operations have been exercised. Physical-iPad testing, the complete deployed handwriting/image-review loop, reliable automatic token renewal, and data export/restore remain. See [remaining release work](docs/architecture.md#12-remaining-release-work).
 
 ---
 
@@ -102,19 +102,25 @@ No terminal. No server. Just a GitHub account and a Cloudflare account.
 
 [Fork this repository](https://github.com/duanxianpi/InkLoop/fork) to your GitHub account.
 
-**2. Deploy your fork**
+**2. Enable R2 in your Cloudflare account**
+
+In Cloudflare Dashboard, choose **Storage & databases → R2 → Overview** and complete the subscription checkout. R2 must be enabled before the first deployment; creating a Cloudflare account does not complete this step. Review the payment/billing details shown by Cloudflare. See [Cloudflare’s R2 setup instructions](https://developers.cloudflare.com/r2/get-started/#before-you-begin).
+
+**3. Deploy your fork**
 
 [![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://dash.cloudflare.com/?to=/:account/workers-and-pages/create)
 
 Choose **Import a repository**, connect GitHub, and select your fork. Set the deploy command to `npm run deploy`, then deploy.
 
-Cloudflare creates the database and storage in your account and publishes your instance.
+Once R2 is enabled, the deploy command provisions the database and storage bindings and publishes your instance. It does not enable an R2 subscription on your behalf.
 
-**3. Claim your instance**
+Follow the [illustrated post-deployment guide](docs/getting-started.md) ([中文图文教程](docs/getting-started.zh-CN.md)) to enable the Worker URL, retrieve the claim key and set your password.
+
+**4. Claim your instance**
 
 Open `/setup` on your new address and choose a password. The one-time setup key is in your database, viewable in the Cloudflare dashboard, and the setup page links to it when it can. See [Deployment](docs/deployment.md#claim-the-owner).
 
-**4. Connect your AI**
+**5. Connect your AI**
 
 Add your instance's MCP endpoint to your AI client and approve access:
 
@@ -122,7 +128,7 @@ Add your instance's MCP endpoint to your AI client and approve access:
 https://<your-instance>/mcp
 ```
 
-**5. Start writing**
+**6. Start writing**
 
 Open your whiteboard on your tablet.
 
@@ -234,7 +240,9 @@ Changes that make the core simpler, more reliable, and easier to understand are 
 
 ## License
 
-<!-- Add the license and link to LICENSE. -->
+InkLoop's original code and documentation are available under the [MIT License](LICENSE). Third-party components retain their own licenses; see [Third-party notices](THIRD_PARTY_NOTICES.txt) and [Licensing](docs/licensing.md).
+
+The pinned **tldraw 3.15.6** canvas SDK uses its own source-available license, which permits commercial and non-commercial use while requiring its native watermark and license validation to remain intact. It is not covered by InkLoop's MIT License. InkLoop is independently developed and is not affiliated with or endorsed by tldraw Inc. Newer SDK versions have different production-license requirements; review licensing before upgrading.
 
 ---
 

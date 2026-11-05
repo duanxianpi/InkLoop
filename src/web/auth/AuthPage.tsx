@@ -207,23 +207,16 @@ function PasswordPage({ data }: { data: Extract<AuthPageData, { kind: 'password'
               <p>
                 It is stored only in this deployment’s Cloudflare D1 database and never shown by
                 this website.{' '}
-                {data.d1ConsoleUrl ? (
-                  <a href={data.d1ConsoleUrl} target="_blank" rel="noreferrer">
-                    Open the database in Cloudflare
-                  </a>
-                ) : (
-                  <>
-                    <a
-                      href="https://dash.cloudflare.com/?to=/:account/workers/d1"
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      Open D1 in Cloudflare
-                    </a>
-                    , choose the database (usually <code>inkloop-db</code>), then Studio
-                  </>
-                )}{' '}
-                and run:
+                <a
+                  href={data.d1ConsoleUrl ?? 'https://dash.cloudflare.com/?to=/:account/workers/d1'}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Open Cloudflare D1
+                </a>
+                . If a database list appears, choose this instance’s database (usually{' '}
+                <code>inkloop-db</code>). On the database overview, click{' '}
+                <strong>Explore Data</strong>. In Studio, run:
               </p>
               <CopyRow text={query} />
               <p className="hint">Copy the value shown in the secret_display column.</p>

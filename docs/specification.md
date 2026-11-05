@@ -1,14 +1,15 @@
 # InkLoop — Product Specification
 
 **Version:** 1.0 — Product behavior requirements  
-**Status:** Implementation target; implemented except for the release checks listed in [Architecture](architecture.md#2-current-implementation-status)  
+**Status:** Product requirements; implementation and outstanding acceptance are tracked in [Architecture](architecture.md#2-current-implementation-status). This document is not a feature-completion checklist.
+
 **Product:** InkLoop  
 **Tagline:** _Give your AI a whiteboard._  
 **Architecture:** Bring Your Own AI · Pen-first · MCP-native · Self-hosted
 
 ## 0. Document Authority
 
-This document defines the intended product behavior, not a claim that those features are available today. See [Architecture](architecture.md) for the implemented foundation, selected technical design and remaining work, and [API contracts](api.md) for the current interfaces.
+This document defines the intended product behavior, not a claim that those features are available today. See [Architecture](architecture.md) for current implementation status, selected technical design and remaining work, and [API contracts](api.md) for the current interfaces.
 
 The internal drawing prototype informed these requirements. It is a behavioral reference, not production source code or a dependency required to build this repository. Explicit requirements below take precedence over prototype behavior.
 
@@ -218,7 +219,7 @@ The Canvas MUST provide:
 - Read-only mode
 - Full-content image export
 
-The latest POC uses four colors:
+The default v1.0 palette, implemented in `src/web/canvas/engine.ts`, has four colors:
 
 - Black
 - Blue
@@ -923,7 +924,7 @@ Caches are acceptable if they can be rebuilt from canonical data.
 
 ## 16. MCP Contract
 
-Implement four core tools.
+The review workflow has four core tools, described below. The current implementation also provides organization and management tools, for 13 tools in total; see [API contracts](api.md#mcp-tools) for the complete surface. Optional figure/image input described below is a product requirement, not a dedicated upload field in the current create schema.
 
 ### 16.1 `create_problems`
 
@@ -990,7 +991,7 @@ Metadata MUST include:
 
 When no Snapshot exists, return a structured Not Ready result rather than an unrelated image.
 
-The default contract always retrieves the latest committed version. Historical image retrieval is not required for the initial MCP surface.
+The default contract retrieves the latest committed version. The current implementation also accepts an optional `snapshot_id` to retrieve an earlier Snapshot; see [API contracts](api.md#mcp-tools).
 
 ### 16.4 `append_feedback`
 
