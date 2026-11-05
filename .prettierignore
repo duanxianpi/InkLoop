@@ -14,3 +14,9 @@ src/server/mcp/tools.generated.ts
 # Preserve verbatim upstream license texts and the generated notice inventory.
 /third-party/upstream/
 /THIRD_PARTY_NOTICES.txt
+
+# Standalone local React demo and its generated assets.
+/src/demo/
+
+# Local promo video project and its renders.
+/promo/

@@ -12,3 +12,9 @@ dist/
 /experiments/
 /prototypes/
 /templates/
+
+# Standalone local React demo and its generated assets.
+/src/demo/
+
+# Local promo video project and its renders.
+/promo/

@@ -8,25 +8,15 @@ Write on your tablet. Let ChatGPT, Claude, or another MCP-compatible AI assistan
 
 **Your AI. Your whiteboard. Your rules.**
 
-[Demo](#see-it-in-action) · [Get Started](#get-started) · [Make It Yours](#make-it-yours)
+[Live Demo](https://inkloop-demo.duanxianpi.workers.dev) · [Get Started](#get-started) · [Documentation](docs/README.md)
 
-> **Status:** the first complete product slice is implemented and tested locally, but InkLoop is not released yet. Deployed OAuth-authorized MCP/D1 operations have been exercised. Physical-iPad testing, the complete deployed handwriting/image-review loop, reliable automatic token renewal, and data export/restore remain. See [remaining release work](docs/architecture.md#12-remaining-release-work).
+## Try It
 
----
+**[Open the interactive demo →](https://inkloop-demo.duanxianpi.workers.dev)**
 
-## See It in Action
+Try the canvas, question navigation, snapshots, and feedback history without an account. Questions and feedback are simulated; no AI is connected. Each tab has its own data, and reloading resets it.
 
-<!-- Demo video or GIF: AI creates a problem → handwritten solution on a tablet → Mark ready → AI feedback → handwritten correction → second review. -->
-
-No screenshots. No uploads. No explaining what you changed since last time.
-
-Just write, review, and refine.
-
-## What It Is
-
-A small, dedicated handwriting workspace that connects to the AI assistant you already use.
-
-Not an AI tutor. Not a note-taking suite. Not a chatbot.
+<!-- Add the walkthrough video here when ready: problem → handwriting → Mark ready → AI feedback → correction → second review. -->
 
 ## How It Works
 
@@ -136,82 +126,13 @@ Open your whiteboard on your tablet.
 
 ## Make It Yours
 
-**Don't like something? Ask your coding agent to change it.**
+Fork InkLoop and ask your coding agent to adapt it: add a pen color, change the layout, or tailor the question flow to your subject. The source code is the customization surface.
 
-A different toolbar. More pen colors. A layout for chemistry. A different review flow. A new MCP tool.
+Push changes to your connected fork to let Cloudflare rebuild and redeploy. See [Development](docs/development.md) for local checks and previews.
 
-Your fork is yours. InkLoop gives you a working foundation — canvas, persistence, authentication, deployment, and MCP — so you only touch the parts you want to change.
+## Device Support
 
-### Customize → Push → Live
-
-**1. Open your fork with your coding agent**
-
-Use Codex, Claude Code, or any coding assistant, and describe what you want:
-
-> Add a purple highlighter to InkLoop. Keep the existing handwriting, snapshot, and MCP functionality working. Update any relevant tests.
-
-> Customize InkLoop for practicing chemistry. Keep the same canvas and feedback workflow, but adapt the question presentation and drawing tools.
-
-**2. Push the change**
-
-Cloudflare rebuilds and redeploys your instance from your fork. Your data stays where it is.
-
-No waiting on upstream for the features you want — and **Sync fork** on GitHub still brings in upstream updates when you want them.
-
-**It's your whiteboard. Make it work the way you think.**
-
-### Customization philosophy
-
-No hundreds of settings. No plugin system.
-
-The source code is the customization surface — kept small and readable for people and coding agents alike. [Development](docs/development.md) covers local checks and previews.
-
----
-
-## How InkLoop Connects to AI
-
-Handwriting and AI reasoning stay separate.
-
-| Component                  | What it does                                             |
-| -------------------------- | -------------------------------------------------------- |
-| **Your tablet or browser** | The handwriting canvas                                   |
-| **Your InkLoop instance**  | Stores drawings, snapshots, and feedback                 |
-| **MCP server**             | Connects the whiteboard to an external AI client         |
-| **Your AI assistant**      | Creates exercises, reads handwriting, and gives feedback |
-
-The AI never handles drawing coordinates, the database, or the canvas implementation. It receives your handwriting as an image, with the question and snapshot it belongs to.
-
-### One rule for revisions
-
-**One problem. One canvas. Multiple snapshots. Append-only feedback.**
-
-Every committed snapshot has a stable, ordered identity. Your AI reviews the latest one, and its feedback is attached to that snapshot specifically.
-
-Corrections never erase earlier work or reviews, and responding to feedback never needs a new question or page.
-
----
-
-## What InkLoop Isn't
-
-InkLoop isn't a replacement for Goodnotes, Notability, Samsung Notes, or your note-taking app of choice. Those are built for lectures, PDFs, and notebooks.
-
-InkLoop does one thing:
-
-**Write something by hand and let your AI assistant see it.**
-
-It doesn't replace your AI conversations, schedule study sessions, or decide how you should learn. Exercises are the main use case, but the same loop works for sketches, diagrams, algorithms, and any other handwritten idea.
-
----
-
-## Device Compatibility
-
-InkLoop runs in the browser and is designed for pen-enabled tablets.
-
-iPad with Apple Pencil is the primary target. Other capable browsers and stylus devices — Galaxy Tab with S Pen, Windows pen tablets — are goals too, as are older tablets that can't run current note apps but still make a good writing surface.
-
-Browser support and pen latency vary by device. A tested compatibility matrix will follow physical-device testing.
-
----
+InkLoop is designed for pen-enabled tablets, with desktop browser support. iPad with Apple Pencil is the primary target; browser support and pen latency still need a tested physical-device compatibility matrix. See [remaining release work](docs/architecture.md#12-remaining-release-work).
 
 ## Built With
 
@@ -227,25 +148,10 @@ Read more in [Architecture](docs/architecture.md) and the [documentation index](
 
 ## Contributing
 
-Bug reports, ideas, and pull requests are welcome. Especially useful:
-
-- Better stylus and touch support
-- Compatibility with older tablets and browsers
-- Accessibility and usability
-- More reliable snapshot rendering
-- Compatibility with more AI clients
-- Clearer self-hosting and customization docs
-
-Changes that make the core simpler, more reliable, and easier to understand are the most welcome of all.
+Bug reports, ideas, and pull requests are welcome, especially for stylus and touch support, accessibility, snapshot rendering, and AI-client compatibility.
 
 ## License
 
 InkLoop's original code and documentation are available under the [MIT License](LICENSE). Third-party components retain their own licenses; see [Third-party notices](THIRD_PARTY_NOTICES.txt) and [Licensing](docs/licensing.md).
 
 The pinned **tldraw 3.15.6** canvas SDK uses its own source-available license, which permits commercial and non-commercial use while requiring its native watermark and license validation to remain intact. It is not covered by InkLoop's MIT License. InkLoop is independently developed and is not affiliated with or endorsed by tldraw Inc. Newer SDK versions have different production-license requirements; review licensing before upgrading.
-
----
-
-**Handwrite. Review. Refine.**
-
-**Your AI. Your whiteboard. Your rules.**
