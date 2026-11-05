@@ -1,41 +1,243 @@
 # InkLoop
 
-Give your AI a whiteboard.
+**Handwrite. Review. Refine.**
 
-InkLoop is a self-hosted handwriting surface for AI agents. An agent creates problems through MCP; the owner writes on a persistent canvas, commits an immutable image, and receives feedback attached to that exact submission. The application runs no model and requires no model API key.
+An open-source, self-hosted whiteboard for learning with your favorite AI.
 
-**Status: first complete product slice, not yet released.** Password sign-in, OAuth-protected MCP, the four MCP tools, durable problems, canvas autosave, Snapshot commits, append-only feedback, live updates and the handwriting board are implemented and tested locally. Physical-iPad testing, a deployed end-to-end run with a real AI client, data export/restore and orphaned-object collection remain before release.
+Write on your tablet. Let ChatGPT, Claude, or another MCP-compatible AI assistant review your work. Make corrections directly on the same canvas and keep the conversation going.
 
-## Development
+**Your AI. Your whiteboard. Your rules.**
 
-```sh
-npm ci
-npm run format:check
-npm run typecheck
-npm run build
-npm test
+[Demo](#see-it-in-action) · [Get Started](#get-started) · [Make It Yours](#make-it-yours)
+
+> **Status:** the first complete product slice is implemented and tested locally, but InkLoop is not released yet. Physical-iPad testing, a deployed end-to-end run with a real AI client, and data export/restore remain. See [remaining release work](docs/architecture.md#12-remaining-release-work).
+
+---
+
+## See It in Action
+
+<!-- Demo video or GIF: AI creates a problem → handwritten solution on a tablet → Mark ready → AI feedback → handwritten correction → second review. -->
+
+No screenshots. No uploads. No explaining what you changed since last time.
+
+Just write, review, and refine.
+
+## What It Is
+
+A small, dedicated handwriting workspace that connects to the AI assistant you already use.
+
+Not an AI tutor. Not a note-taking suite. Not a chatbot.
+
+## How It Works
+
+**1. Ask your AI for a problem**
+
+In ChatGPT, Claude, or another compatible client, your assistant sends questions straight to InkLoop through MCP.
+
+**2. Solve it by hand**
+
+Open InkLoop on your tablet and write with your stylus. Equations, diagrams, scratch work, erasures — however you think.
+
+**3. Mark it ready**
+
+InkLoop commits a snapshot of your work and makes it available to your AI.
+
+Nothing is graded or sent to a model automatically. You stay in control of the conversation.
+
+**4. Get feedback**
+
+Ask your AI to review. It retrieves your latest snapshot and attaches feedback to the exact version it reviewed.
+
+**5. Refine and repeat**
+
+Keep editing on the **same canvas**. Correct a mistake in another color, extend a derivation, answer a follow-up.
+
+Mark it ready again, and your AI reviews the update. Earlier snapshots and feedback stay available.
+
+**One canvas. Multiple revisions. A continuous learning loop.**
+
+---
+
+## Features
+
+### Built for handwriting
+
+- **Pen-first canvas** — a distraction-free surface for equations, diagrams, and sketches.
+- **Tablet-friendly** — designed around stylus and touch, with desktop browser support.
+- **Problem organization** — collections and problem sets, without turning your whiteboard into a learning management system.
+- **Mark ready** — you decide when your work is ready for review.
+- **Versioned snapshots** — every committed version of your work is preserved.
+- **Feedback history** — reviews accumulate instead of replacing each other.
+
+### Bring your own AI
+
+InkLoop contains no LLM, hosts no chatbot, and needs no model API key.
+
+It exposes your whiteboard to AI assistants through the **Model Context Protocol (MCP)**. Your AI creates problems, retrieves handwritten work, and appends feedback while the conversation stays in your existing client.
+
+Use the model you prefer. Switch whenever you want.
+
+_Client support depends on each client's MCP capabilities and permissions._
+
+### Self-hosted by design
+
+InkLoop runs in **your own Cloudflare account**.
+
+- No InkLoop account or hosted subscription.
+- No local computer or server that has to stay running.
+- Your whiteboard data lives in your deployment.
+- Your instance, your storage, your control.
+
+One deployment gives you the web app, database, sign-in, and MCP server together.
+
+_Cloudflare usage is subject to its service limits and pricing._
+
+---
+
+## Get Started
+
+No terminal. No server. Just a GitHub account and a Cloudflare account.
+
+**1. Fork InkLoop**
+
+[Fork this repository](https://github.com/duanxianpi/InkLoop/fork) to your GitHub account.
+
+**2. Deploy your fork**
+
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://dash.cloudflare.com/?to=/:account/workers-and-pages/create)
+
+Choose **Import a repository**, connect GitHub, and select your fork. Set the deploy command to `npm run deploy`, then deploy.
+
+Cloudflare creates the database and storage in your account and publishes your instance.
+
+**3. Claim your instance**
+
+Open `/setup` on your new address and choose a password. The one-time setup key is in your database, viewable in the Cloudflare dashboard, and the setup page links to it when it can. See [Deployment](docs/deployment.md#claim-the-owner).
+
+**4. Connect your AI**
+
+Add your instance's MCP endpoint to your AI client and approve access:
+
+```
+https://<your-instance>/mcp
 ```
 
-Tests use local Miniflare/D1/KV/R2 fixtures and do not deploy cloud resources. Build before testing: integration tests execute the generated Worker and assets.
+**5. Start writing**
 
-## Architecture
+Open your whiteboard on your tablet.
 
-One Cloudflare Worker serves the Web and MCP interfaces. D1 stores structured state, private R2 stores drawing documents and images, KV supports the OAuth SDK, and a ChangeHub Durable Object is reserved for notification-only WebSockets.
+---
 
-- Browser API and MCP tools call the same application service contracts.
-- Authentication resolves the owner before product handlers run.
-- One React SPA renders account and product pages; Hono serves page shells and routes all APIs; Cloudflare serves public static assets directly with immutable caching.
-- A persistent Canvas, immutable Snapshots and append-only Feedback have separate identities and lifecycles.
-- Product commits will use D1 as the authoritative boundary; notifications never determine whether a save succeeded.
+## Make It Yours
 
-## Documentation
+**Don't like something? Ask your coding agent to change it.**
 
-Start with [the final architecture](docs/architecture.md) or the [documentation index](docs/README.md).
+A different toolbar. More pen colors. A layout for chemistry. A different review flow. A new MCP tool.
 
-- [Product specification](docs/specification.md)
-- [API contracts](docs/api.md)
-- [Authentication](docs/auth-integration.md)
-- [Deployment and recovery](docs/deployment.md)
-- [Development and verification](docs/development.md)
+Your fork is yours. InkLoop gives you a working foundation — canvas, persistence, authentication, deployment, and MCP — so you only touch the parts you want to change.
 
-Public documentation lives in `docs/` and is included in source control. Internal plans, historical evidence and prototypes are excluded. Credentials and deployment state stay in ignored `.private/` and `.wrangler/` directories.
+### Customize → Push → Live
+
+**1. Open your fork with your coding agent**
+
+Use Codex, Claude Code, or any coding assistant, and describe what you want:
+
+> Add a purple highlighter to InkLoop. Keep the existing handwriting, snapshot, and MCP functionality working. Update any relevant tests.
+
+> Customize InkLoop for practicing chemistry. Keep the same canvas and feedback workflow, but adapt the question presentation and drawing tools.
+
+**2. Push the change**
+
+Cloudflare rebuilds and redeploys your instance from your fork. Your data stays where it is.
+
+No waiting on upstream for the features you want — and **Sync fork** on GitHub still brings in upstream updates when you want them.
+
+**It's your whiteboard. Make it work the way you think.**
+
+### Customization philosophy
+
+No hundreds of settings. No plugin system.
+
+The source code is the customization surface — kept small and readable for people and coding agents alike. [Development](docs/development.md) covers local checks and previews.
+
+---
+
+## How InkLoop Connects to AI
+
+Handwriting and AI reasoning stay separate.
+
+| Component                  | What it does                                             |
+| -------------------------- | -------------------------------------------------------- |
+| **Your tablet or browser** | The handwriting canvas                                   |
+| **Your InkLoop instance**  | Stores drawings, snapshots, and feedback                 |
+| **MCP server**             | Connects the whiteboard to an external AI client         |
+| **Your AI assistant**      | Creates exercises, reads handwriting, and gives feedback |
+
+The AI never handles drawing coordinates, the database, or the canvas implementation. It receives your handwriting as an image, with the question and snapshot it belongs to.
+
+### One rule for revisions
+
+**One problem. One canvas. Multiple snapshots. Append-only feedback.**
+
+Every committed snapshot has a stable, ordered identity. Your AI reviews the latest one, and its feedback is attached to that snapshot specifically.
+
+Corrections never erase earlier work or reviews, and responding to feedback never needs a new question or page.
+
+---
+
+## What InkLoop Isn't
+
+InkLoop isn't a replacement for Goodnotes, Notability, Samsung Notes, or your note-taking app of choice. Those are built for lectures, PDFs, and notebooks.
+
+InkLoop does one thing:
+
+**Write something by hand and let your AI assistant see it.**
+
+It doesn't replace your AI conversations, schedule study sessions, or decide how you should learn. Exercises are the main use case, but the same loop works for sketches, diagrams, algorithms, and any other handwritten idea.
+
+---
+
+## Device Compatibility
+
+InkLoop runs in the browser and is designed for pen-enabled tablets.
+
+iPad with Apple Pencil is the primary target. Other capable browsers and stylus devices — Galaxy Tab with S Pen, Windows pen tablets — are goals too, as are older tablets that can't run current note apps but still make a good writing surface.
+
+Browser support and pen latency vary by device. A tested compatibility matrix will follow physical-device testing.
+
+---
+
+## Built With
+
+- **Cloudflare Workers** — one Worker serves the web app and MCP endpoint
+- **D1** for structured data, private **R2** for drawings and snapshot images, **KV** for OAuth, a **Durable Object** for live updates
+- **Hono** for routing, **React** for the app, **tldraw** for the canvas, **MathJax** for math in questions
+- **workers-oauth-provider** for OAuth-protected MCP access
+- **zod** schemas shared by the browser API and MCP tools
+
+Read more in [Architecture](docs/architecture.md) and the [documentation index](docs/README.md).
+
+---
+
+## Contributing
+
+Bug reports, ideas, and pull requests are welcome. Especially useful:
+
+- Better stylus and touch support
+- Compatibility with older tablets and browsers
+- Accessibility and usability
+- More reliable snapshot rendering
+- Compatibility with more AI clients
+- Clearer self-hosting and customization docs
+
+Changes that make the core simpler, more reliable, and easier to understand are the most welcome of all.
+
+## License
+
+<!-- Add the license and link to LICENSE. -->
+
+---
+
+**Handwrite. Review. Refine.**
+
+**Your AI. Your whiteboard. Your rules.**
