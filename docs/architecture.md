@@ -27,9 +27,9 @@ There is no built-in LLM, model API key, chat system, automatic grader, backgrou
 | ChangeHub, change counter and long-poll services                | Implemented; WebSocket, catch-up and long-poll covered by local tests                |
 | Local drafts, serial save queue, conflict recovery              | Implemented (IndexedDB, `src/web/sync/`)                                             |
 | Installable PWA and offline board reads                         | Implemented (`src/sw/sw.ts`, `src/web/pwa.ts`); local service-worker tests           |
-| Export/restore, object collection, complete product acceptance  | Pending                                                                              |
+| Export/restore, object collection                               | Pending                                                                              |
 
-Local tests run the real Worker, D1, R2 and ChangeHub in Miniflare, including concurrent commits, idempotent retries and stale-epoch rollback. The [production CPU run](experiments/performance-production-2026-11-04.md) exercised real OAuth-authorized MCP reads, creation, updates and deletion with D1 persistence. Repeated reauthorization occurred during that run and remains unresolved. Physical-device handwriting, the complete deployed image-review loop and first-install/upgrade acceptance remain release checks.
+Local tests run the real Worker, D1, R2 and ChangeHub in Miniflare, including concurrent commits, idempotent retries and stale-epoch rollback. The [production CPU run](experiments/performance-production-2026-11-04.md) exercised real OAuth-authorized MCP reads, creation, updates and deletion with D1 persistence. Repeated reauthorization occurred during that run and has not recurred since. A deployed instance has also run the complete loop with a real AI client over OAuth: problems created through MCP, handwritten on a physical iPad, marked ready, read with `get_submission`, reviewed with `append_feedback`, revised and reviewed again. First-install/upgrade acceptance remains a release check.
 
 ## 3. Runtime topology
 
@@ -245,7 +245,4 @@ See [Deployment](deployment.md) and [Development](development.md) for commands a
 
 ## 12. Remaining release work
 
-1. Physical iPad acceptance (§21 of the specification): Pencil latency, palm rejection, gestures, toolbar placement, touch-target size at the POC's 75% chrome scale, and the time PBKDF2 takes at sign-in.
-2. A deployed run with a real AI client: OAuth onboarding, create → write → Mark ready → `get_submission` → `append_feedback`.
-3. Data export/restore and collection of unreferenced R2 objects (failed uploads whose outcome was unknown) with a retention window.
-4. Resolve repeated MCP reauthorization seen during the [production CPU run](experiments/performance-production-2026-11-04.md), then extend CPU measurements to Canvas/Snapshot/R2 and feedback paths, idle behavior and broader workloads. Basic MCP/D1 operations have been measured; a strict 10 ms budget is not established.
+Data export/restore, and collection of unreferenced R2 objects (failed uploads whose outcome was unknown) with a retention window.

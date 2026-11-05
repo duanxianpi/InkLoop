@@ -89,7 +89,7 @@ Ignoring a path does not remove files already tracked by Git. Inspect the reposi
 
 ## Release checks still outstanding
 
-Physical iPad use; fresh-install/upgrade acceptance with current assets and migrations; the complete deployed OAuth client image-review loop; Snapshot export quality on dense handwriting; data export/restore; safe orphan-object collection; repeated MCP reauthorization; CPU measurements of Canvas/Snapshot/R2 and feedback paths. The [2026-11-04 production run](experiments/performance-production-2026-11-04.md) already covers real OAuth-authorized MCP/D1 creation, listing, reads, updates and deletion, with some requests above 10 ms.
+Fresh-install/upgrade acceptance with current assets and migrations; Snapshot export quality on dense handwriting; data export/restore; safe orphan-object collection. The [2026-11-04 production run](experiments/performance-production-2026-11-04.md) covers real OAuth-authorized MCP/D1 creation, listing, reads, updates and deletion, with some requests above 10 ms. A deployed instance has since completed the handwritten image-review loop with a real AI client on a physical iPad.
 
 CPU diagnostics: `npm run perf` reports Node first-method CPU samples separately from correctness tests. These samples are not independent cold isolates or Cloudflare CPU measurements.
 

@@ -1,6 +1,6 @@
 # Documentation
 
-These pages describe the current implementation, product requirements and outstanding release checks. Implementation status was reviewed against source on 2026-11-04; historical measurements describe only their recorded versions.
+These pages describe the current implementation, product requirements and outstanding release checks. Implementation status was reviewed against source on 2026-11-05; historical measurements describe only their recorded versions.
 
 | Document                                                                         | Purpose                                                                                                     |
 | -------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |

@@ -132,7 +132,7 @@ Push changes to your connected fork to let Cloudflare rebuild and redeploy. See 
 
 ## Device Support
 
-InkLoop is designed for pen-enabled tablets, with desktop browser support. iPad with Apple Pencil is the primary target; browser support and pen latency still need a tested physical-device compatibility matrix. See [remaining release work](docs/architecture.md#12-remaining-release-work).
+InkLoop is designed for pen-enabled tablets, with desktop browser support. iPad with Apple Pencil is the primary target and is used for real problem sets; other tablets, styluses and browsers are not tested yet.
 
 ## Built With
 

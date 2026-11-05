@@ -40,7 +40,7 @@ The deploy command regenerates `dist/public/`, including versioned drawing asset
 
 Import your copy of this repository into Cloudflare Workers using its Git integration. Configure `npm run typecheck` as the build command and `npm run deploy` as the deploy command. The deploy script performs the actual asset build before migration or publication. Use the repository's `wrangler.jsonc` and migrations. Enable the target account’s R2 subscription in the dashboard before starting the deployment; the noninteractive build cannot complete the checkout for you. The deployment credentials must also have R2 access.
 
-The existing deployment has exercised real OAuth-authorized MCP/D1 creation, listing, reads, updates and deletion; see the [production measurements](experiments/performance-production-2026-11-04.md). Repeated reauthorization remains unresolved. A full fresh-install/upgrade run through the deployment script and the complete handwritten image-review loop remain release checks.
+The existing deployment has exercised real OAuth-authorized MCP/D1 creation, listing, reads, updates and deletion; see the [production measurements](experiments/performance-production-2026-11-04.md). The repeated reauthorization seen in that run has not recurred, and the complete handwritten image-review loop has since run on a deployed instance with a real AI client. A full fresh-install/upgrade run through the deployment script remains a release check.
 
 ## Enable the production URL
 

@@ -65,7 +65,7 @@ Connected-app revocation requires a recent session. It writes a D1 revocation ma
 
 Upstream changes require a reviewed merge and authentication regression checks. Auth migrations `0001`–`0003` and `0005` remain immutable after deployment. Dependencies are pinned in the manifest and lockfile.
 
-Local tests cover password setup, sign-in throttling, change and recovery (`tests/password-auth.test.mjs`), commit-time races between those flows against real D1 (`tests/auth-races.test.mjs`), the Hono route tree, public assets, private API/session boundaries, CSRF, consent preparation/approval/denial/replay, PKCE exchange, MCP discovery and epoch invalidation. Browser fixtures check actual SPA rendering and interactions. The [2026-11-04 production run](experiments/performance-production-2026-11-04.md) exercised connected-client MCP/D1 operations, but the complete deployed handwriting/image-review loop remains a separate acceptance check.
+Local tests cover password setup, sign-in throttling, change and recovery (`tests/password-auth.test.mjs`), commit-time races between those flows against real D1 (`tests/auth-races.test.mjs`), the Hono route tree, public assets, private API/session boundaries, CSRF, consent preparation/approval/denial/replay, PKCE exchange, MCP discovery and epoch invalidation. Browser fixtures check actual SPA rendering and interactions. The [2026-11-04 production run](experiments/performance-production-2026-11-04.md) exercised connected-client MCP/D1 operations, and a deployed instance has since completed the handwriting/image-review loop with a real AI client.
 
 ### Known deployed authentication issue
 
