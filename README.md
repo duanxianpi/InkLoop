@@ -16,7 +16,7 @@ Write on your tablet. Let ChatGPT, Claude, or another MCP-compatible AI assistan
 
 Try the canvas, question navigation, snapshots, and feedback history without an account. Questions and feedback are simulated; no AI is connected. Each tab has its own data, and reloading resets it.
 
-<!-- Add the walkthrough video here when ready: problem → handwriting → Mark ready → AI feedback → correction → second review. -->
+[![InkLoop in one minute: a problem from your AI, a handwritten answer, feedback, and a correction on the same canvas](docs/images/inkloop-promo-poster.jpg)](https://inkloop-demo.duanxianpi.workers.dev/promo/)
 
 ## How It Works
 
